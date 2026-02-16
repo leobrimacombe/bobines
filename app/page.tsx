@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '../utils/supabase/client'
 import { addSpool, deleteSpool, consumeSpool, updateSpool, updateThreshold } from './actions'
-import { Search, Plus, Trash2, Disc3, LogOut, X, Edit2, Minus, Settings, Package, Euro, AlertTriangle, Check } from 'lucide-react'
+import { Search, Plus, Trash2, Disc3, LogOut, X, Edit2, Minus, Settings, Package, Euro, AlertTriangle, Check, History, Calculator, Calendar, Droplets } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 // --- DONNÉES ---
@@ -27,55 +27,31 @@ const BAMBU_COLORS = [
   { name: 'Argent', ref: '10102', hex: '#C0C0C0' }, { name: 'Or', ref: '10103', hex: '#FFD700' }
 ];
 
-// --- COMPOSANT INPUT "APPLE STYLE" (Curseur Pointer Force) ---
 const CustomInput = ({ label, name, value, setValue, list, placeholder, onSelect, type = "text", step }: any) => {
   const [showList, setShowList] = useState(false);
-
   return (
     <div className="group">
       <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">{label}</label>
       <div className="relative">
         <input 
-          type={type}
-          step={step}
-          name={name} 
-          value={value} 
+          type={type} step={step} name={name} value={value} 
           onChange={(e) => { setValue(e.target.value); if(list) setShowList(true); }}
           onFocus={() => { if(list) setShowList(true); }}
           onBlur={() => setTimeout(() => setShowList(false), 200)}
-          placeholder={placeholder} 
-          autoComplete="off"
-          // AJOUT DE 'cursor-pointer' ICI
+          placeholder={placeholder} autoComplete="off"
           className="w-full bg-gray-50/50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium placeholder:text-gray-400 cursor-pointer" 
           required 
         />
         {showList && list && list.length > 0 && (
           <ul className="absolute z-50 w-full mt-2 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-xl max-h-48 overflow-y-auto shadow-xl animate-fade">
-            {list.filter((item: any) => 
-               typeof item === 'string' 
-               ? item.toLowerCase().includes(value.toLowerCase()) 
-               : (item.name.toLowerCase().includes(value.toLowerCase()) || item.ref.includes(value))
-            ).map((item: any, index: number) => {
+            {list.filter((item: any) => typeof item === 'string' ? item.toLowerCase().includes(value.toLowerCase()) : (item.name.toLowerCase().includes(value.toLowerCase()) || item.ref.includes(value))).map((item: any, index: number) => {
                const isString = typeof item === 'string';
                const display = isString ? item : item.name;
                const subtext = isString ? null : `#${item.ref}`;
                const hex = isString ? null : item.hex;
-
                return (
-                  <li 
-                    key={index} 
-                    onClick={() => { 
-                      setValue(display); 
-                      setShowList(false);
-                      if (onSelect) onSelect(item); 
-                    }} 
-                    // AJOUT DE 'cursor-pointer' ICI AUSSI
-                    className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 flex items-center justify-between text-gray-800 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      {hex && <div className="w-5 h-5 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: hex }}></div>}
-                      <span className="font-medium">{display}</span>
-                    </div>
+                  <li key={index} onClick={() => { setValue(display); setShowList(false); if (onSelect) onSelect(item); }} className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 flex items-center justify-between text-gray-800 transition-colors">
+                    <div className="flex items-center gap-3">{hex && <div className="w-5 h-5 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: hex }}></div>}<span className="font-medium">{display}</span></div>
                     {subtext && <span className="text-gray-400 text-xs font-mono">{subtext}</span>}
                   </li>
                )
@@ -89,26 +65,35 @@ const CustomInput = ({ label, name, value, setValue, list, placeholder, onSelect
 
 export default function Home() {
   const [bobines, setBobines] = useState<any[]>([])
+  const [history, setHistory] = useState<any[]>([]) // Nouvel état pour l'historique
   const [user, setUser] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'stock' | 'alerte'>('stock')
+  const [activeTab, setActiveTab] = useState<'stock' | 'history' | 'alerte'>('stock')
   
+  // Settings
   const [lowStockThreshold, setLowStockThreshold] = useState(200)
   const [similarStockThreshold, setSimilarStockThreshold] = useState(2)
   
+  // Filters & Tools
   const [search, setSearch] = useState('')
   const [filterMaterial, setFilterMaterial] = useState('Tous')
+  const [showCalculator, setShowCalculator] = useState(false)
+  const [calcWeight, setCalcWeight] = useState('')
+  const [calcMaterial, setCalcMaterial] = useState('PLA')
   
+  // Modals
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingBobine, setEditingBobine] = useState<any>(null)
   const [addQuantity, setAddQuantity] = useState(1)
 
+  // Form Fields
   const [brandInput, setBrandInput] = useState('')
   const [materialInput, setMaterialInput] = useState('')
   const [colorInput, setColorInput] = useState('')
   const [colorHex, setColorHex] = useState('#000000')
   const [priceInput, setPriceInput] = useState('')
   const [weightInput, setWeightInput] = useState('1000')
+  const [dateInput, setDateInput] = useState(new Date().toISOString().split('T')[0])
 
   const supabase = createClient()
   const router = useRouter()
@@ -118,9 +103,15 @@ export default function Home() {
     if (!user) return router.push('/login')
     setUser(user)
 
+    // Bobines
     const { data: spools } = await supabase.from('spools').select('*').order('created_at', { ascending: false })
     setBobines(spools || [])
 
+    // Historique
+    const { data: logs } = await supabase.from('consumption_logs').select('*').order('created_at', { ascending: false }).limit(50)
+    setHistory(logs || [])
+
+    // Settings
     const { data: settings } = await supabase.from('user_settings').select('*').single()
     if (settings) {
       setLowStockThreshold(settings.low_stock_threshold || 200)
@@ -135,6 +126,7 @@ export default function Home() {
     router.push('/login')
   }
 
+  // --- LOGIQUE ---
   const filteredBobines = bobines.filter(b => {
     const matchSearch = b.brand.toLowerCase().includes(search.toLowerCase()) || 
                         (b.color_name && b.color_name.toLowerCase().includes(search.toLowerCase())) ||
@@ -144,6 +136,15 @@ export default function Home() {
   })
 
   const totalValue = bobines.reduce((acc, b) => acc + (b.price || 0), 0);
+
+  // Vérification de l'âge (6 mois = warning)
+  const isOldSpool = (dateString: string) => {
+      if(!dateString) return false;
+      const openDate = new Date(dateString);
+      const sixMonthsAgo = new Date();
+      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+      return openDate < sixMonthsAgo;
+  }
 
   const getLowStockSimilarGroups = () => {
     const groups: {[key: string]: number} = {};
@@ -161,7 +162,7 @@ export default function Home() {
   const materials = ['Tous', ...new Set(bobines.map(b => b.material).filter(Boolean))]
 
   const resetFields = () => {
-      setBrandInput(''); setMaterialInput(''); setColorInput(''); setColorHex('#000000'); setPriceInput(''); setWeightInput('1000'); setAddQuantity(1);
+      setBrandInput(''); setMaterialInput(''); setColorInput(''); setColorHex('#000000'); setPriceInput(''); setWeightInput('1000'); setAddQuantity(1); setDateInput(new Date().toISOString().split('T')[0]);
   }
 
   const loadEditFields = (bobine: any) => {
@@ -172,6 +173,7 @@ export default function Home() {
       setColorHex(bobine.color_hex || '#000000');
       setPriceInput(bobine.price);
       setWeightInput(bobine.weight_initial);
+      setDateInput(bobine.date_opened || new Date().toISOString().split('T')[0]);
       setIsEditModalOpen(true);
   }
 
@@ -186,7 +188,6 @@ export default function Home() {
         .animate-fade { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
 
-      {/* --- HEADER --- */}
       <header className="bg-white/70 backdrop-blur-xl border-b border-gray-200/50 sticky top-0 z-30 transition-all">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
@@ -197,17 +198,14 @@ export default function Home() {
           </div>
 
           <nav className="bg-gray-200/50 p-1 rounded-lg flex items-center">
-            <button 
-              onClick={() => setActiveTab('stock')}
-              className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'stock' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
-            >
-              <Package size={14} /> Stock
+            <button onClick={() => setActiveTab('stock')} className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'stock' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}>
+              <Package size={14} /> <span className="hidden xs:inline">Stock</span>
             </button>
-            <button 
-              onClick={() => setActiveTab('alerte')}
-              className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'alerte' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}
-            >
-              <Settings size={14} /> Alertes
+            <button onClick={() => setActiveTab('history')} className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'history' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}>
+              <History size={14} /> <span className="hidden xs:inline">Historique</span>
+            </button>
+            <button onClick={() => setActiveTab('alerte')} className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'alerte' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}>
+              <Settings size={14} /> <span className="hidden xs:inline">Config</span>
             </button>
           </nav>
 
@@ -255,24 +253,67 @@ export default function Home() {
                    </div>
                 </div>
               ) : (
-                 <button onClick={() => { resetFields(); setIsModalOpen(true); }} className="lg:col-span-2 bg-white p-6 rounded-2xl border border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50/50 transition-all flex items-center justify-center gap-3 group active:scale-[0.99] shadow-[0_2px_8px_rgba(0,0,0,0.02)] cursor-pointer">
+                 <button onClick={() => setShowCalculator(!showCalculator)} className="lg:col-span-2 bg-white p-6 rounded-2xl border border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50/50 transition-all flex items-center justify-center gap-3 group active:scale-[0.99] shadow-[0_2px_8px_rgba(0,0,0,0.02)] cursor-pointer">
                     <div className="bg-gray-100 group-hover:bg-blue-500 p-2 rounded-full transition-colors">
-                        <Plus size={20} className="text-gray-500 group-hover:text-white transition-colors" />
+                        <Calculator size={20} className="text-gray-500 group-hover:text-white transition-colors" />
                     </div>
-                    <span className="text-sm font-semibold text-gray-500 group-hover:text-blue-600">Ajouter une nouvelle bobine</span>
+                    <span className="text-sm font-semibold text-gray-500 group-hover:text-blue-600">Calculateur de Projet</span>
                  </button>
               )}
             </div>
 
-            {similarAlerts.length > 0 && (
-               <button onClick={() => { resetFields(); setIsModalOpen(true); }} className="w-full bg-black text-white p-4 rounded-xl shadow-lg shadow-black/10 hover:bg-gray-900 transition-all flex items-center justify-center gap-3 active:scale-[0.99] cursor-pointer">
-                  <Plus size={20} />
-                  <span className="text-sm font-semibold">Ajouter une bobine</span>
-               </button>
+            {/* --- CALCULATEUR DE PROJET (EXPANDABLE) --- */}
+            {showCalculator && (
+                <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-xl animate-fade mb-6">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Calculator size={20} className="text-blue-500"/> Calculateur de coût</h3>
+                        <button onClick={() => setShowCalculator(false)}><X size={20} className="text-gray-400 hover:text-black cursor-pointer"/></button>
+                    </div>
+                    <div className="flex flex-col md:flex-row gap-4 items-end">
+                        <div className="flex-1 w-full">
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Poids du modèle (g)</label>
+                            <input type="number" value={calcWeight} onChange={(e) => setCalcWeight(e.target.value)} className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none font-bold cursor-pointer" placeholder="ex: 350" />
+                        </div>
+                        <div className="flex-1 w-full">
+                            <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Matière</label>
+                            <select value={calcMaterial} onChange={(e) => setCalcMaterial(e.target.value)} className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none font-bold cursor-pointer">
+                                {SUGGESTED_MATERIALS.map(m => <option key={m} value={m}>{m}</option>)}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    {calcWeight && (
+                        <div className="mt-6 space-y-3">
+                            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest">Bobines compatibles :</p>
+                            {bobines.filter(b => b.material === calcMaterial && (b.weight_initial - (b.weight_used || 0)) >= parseInt(calcWeight)).length === 0 ? (
+                                <p className="text-sm text-red-500 font-medium italic">Aucune bobine de {calcMaterial} n'a assez de filament.</p>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                    {bobines.filter(b => b.material === calcMaterial && (b.weight_initial - (b.weight_used || 0)) >= parseInt(calcWeight)).map(b => (
+                                        <div key={b.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-100">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: b.color_hex }}></div>
+                                                <span className="text-xs font-bold text-gray-800">{b.brand} {b.color_name}</span>
+                                            </div>
+                                            <span className="text-xs font-bold text-blue-600">
+                                                {b.price > 0 ? `${((b.price / b.weight_initial) * parseInt(calcWeight)).toFixed(2)} €` : 'N/A'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* --- RECHERCHE --- */}
             <div className="flex flex-col md:flex-row gap-4 items-center">
+              {/* Le bouton Ajouter est là si pas d'alerte, sinon plus haut */}
+              <button onClick={() => { resetFields(); setIsModalOpen(true); }} className="md:w-auto w-full bg-black text-white px-6 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-800 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2">
+                  <Plus size={18} /> Ajouter
+              </button>
+
               <div className="relative flex-1 w-full group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
                 <input 
@@ -297,6 +338,7 @@ export default function Home() {
                 const reste = poidsInitial - (bobine.weight_used || 0);
                 const pourcent = Math.max(0, Math.min(100, (reste / poidsInitial) * 100));
                 const isLow = reste < lowStockThreshold;
+                const isOld = isOldSpool(bobine.date_opened);
                 
                 return (
                   <div key={bobine.id} className={`bg-white rounded-2xl border overflow-hidden hover:shadow-xl hover:shadow-black/5 transition-all duration-300 flex flex-col group hover:-translate-y-1 ${isLow ? 'border-orange-200 shadow-orange-50' : 'border-gray-100 shadow-sm'}`}>
@@ -305,11 +347,18 @@ export default function Home() {
                         <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm border border-black/5">
                             <span className="text-[10px] font-bold text-gray-900 tracking-tight">#{bobine.spool_number}</span>
                         </div>
-                        {bobine.price > 0 && (
-                           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm border border-black/5 flex items-center gap-1">
-                              <span className="text-[10px] font-bold text-gray-900">{bobine.price} €</span>
-                           </div>
-                        )}
+                        <div className="absolute top-3 right-3 flex gap-2">
+                            {isOld && (
+                                <div className="bg-blue-50/90 backdrop-blur-md p-1 rounded-lg shadow-sm border border-blue-100 text-blue-500" title="Ouvert depuis > 6 mois">
+                                    <Droplets size={12} />
+                                </div>
+                            )}
+                            {bobine.price > 0 && (
+                               <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm border border-black/5 flex items-center gap-1">
+                                  <span className="text-[10px] font-bold text-gray-900">{bobine.price} €</span>
+                               </div>
+                            )}
+                        </div>
                         <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-transparent pointer-events-none"></div>
                     </div>
 
@@ -354,6 +403,7 @@ export default function Home() {
                           const input = document.getElementById(`input-${bobine.id}`) as HTMLInputElement; 
                           if (input) input.value = ''; 
                       }} className="mt-auto flex gap-2">
+                        {/* INPUT PROJET NAME CACHÉ DANS CE MODE SIMPLE, MAIS POSSIBLE D'AJOUTER */}
                         <div className="relative flex-1">
                             <input id={`input-${bobine.id}`} type="number" name="amount" placeholder="Conso." className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium transition-all cursor-pointer" required />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold pointer-events-none">g</span>
@@ -366,6 +416,37 @@ export default function Home() {
               })}
             </div>
           </>
+        ) : activeTab === 'history' ? (
+          /* --- HISTORIQUE --- */
+          <div className="max-w-3xl mx-auto space-y-6">
+             <div className="bg-white p-8 rounded-[2.5rem] border border-gray-200 shadow-xl animate-fade">
+                <h2 className="text-2xl font-bold tracking-tight mb-6 text-gray-900 flex items-center gap-3"><History className="text-blue-500" /> Historique des impressions</h2>
+                
+                {history.length === 0 ? (
+                    <p className="text-gray-400 text-center py-10 italic">Aucune impression enregistrée.</p>
+                ) : (
+                    <div className="relative border-l-2 border-gray-100 ml-4 space-y-8 py-2">
+                        {history.map((log) => (
+                            <div key={log.id} className="relative pl-8">
+                                <div className="absolute -left-[9px] top-1 w-4 h-4 bg-white border-2 border-blue-500 rounded-full"></div>
+                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-1">
+                                    <h4 className="font-bold text-gray-900 text-lg">{log.project_name}</h4>
+                                    <span className="text-xs text-gray-400 font-medium">{new Date(log.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</span>
+                                </div>
+                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-semibold text-gray-700">{log.spool_name}</p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="text-xl font-bold text-blue-600">-{log.amount}g</p>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+             </div>
+          </div>
         ) : (
           /* --- CONFIGURATION --- */
           <div className="max-w-xl mx-auto bg-white p-10 rounded-[2.5rem] border border-gray-200 shadow-xl animate-fade">
@@ -373,7 +454,6 @@ export default function Home() {
             <p className="text-gray-500 mb-8 text-sm">Gérez vos seuils d'alertes automatiques.</p>
             
             <form action={async (formData) => { await updateThreshold(formData); fetchData(); alert('Préférences mises à jour.'); }} className="space-y-8">
-              
               <div className="space-y-6">
                   <div>
                     <label className="flex justify-between text-sm font-medium text-gray-700 mb-4">
@@ -396,14 +476,13 @@ export default function Home() {
                     </div>
                   </div>
               </div>
-
               <button type="submit" className="w-full bg-black hover:bg-gray-800 text-white py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg active:scale-[0.98] transition-all cursor-pointer">ENREGISTRER</button>
             </form>
           </div>
         )}
       </main>
 
-      {/* --- MODALE AJOUT --- */}
+      {/* --- MODALES --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-gray-900/20 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade">
             <div className="bg-white w-full max-w-lg p-8 rounded-[2rem] shadow-2xl relative animate-modal max-h-[90vh] overflow-y-auto border border-gray-100">
@@ -426,13 +505,9 @@ export default function Home() {
                     </div>
 
                     <CustomInput 
-                      label="Couleur" 
-                      name="color" 
-                      value={colorInput} 
-                      setValue={setColorInput} 
+                      label="Couleur" name="color" value={colorInput} setValue={setColorInput} 
                       list={brandInput.toLowerCase().includes('bambu') ? BAMBU_COLORS : []} 
-                      placeholder="Nom de la couleur"
-                      onSelect={(item: any) => { if(item.hex) setColorHex(item.hex); }}
+                      placeholder="Nom de la couleur" onSelect={(item: any) => { if(item.hex) setColorHex(item.hex); }}
                     />
                     
                     <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
@@ -442,9 +517,15 @@ export default function Home() {
                        <label htmlFor="colorPicker" className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">Modifier</label>
                     </div>
 
-                    <div>
-                        <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Prix (€)</label>
-                        <input type="number" step="0.01" name="price" placeholder="0.00" className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Prix (€)</label>
+                            <input type="number" step="0.01" name="price" placeholder="0.00" className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Date d'ouverture</label>
+                            <input type="date" name="date_opened" value={dateInput} onChange={(e) => setDateInput(e.target.value)} className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
+                        </div>
                     </div>
                     
                     <div className="pt-4 flex gap-4">
@@ -487,9 +568,15 @@ export default function Home() {
                        <input type="color" name="color_hex" value={colorHex} onChange={(e) => setColorHex(e.target.value)} className="opacity-0 w-0 h-0" id="colorPickerEdit" />
                        <label htmlFor="colorPickerEdit" className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">Modifier</label>
                     </div>
-                    <div>
-                        <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Prix (€)</label>
-                        <input type="number" step="0.01" name="price" defaultValue={editingBobine.price} className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Prix (€)</label>
+                            <input type="number" step="0.01" name="price" defaultValue={editingBobine.price} className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
+                        </div>
+                        <div>
+                            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Date d'ouverture</label>
+                            <input type="date" name="date_opened" value={dateInput} onChange={(e) => setDateInput(e.target.value)} className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
+                        </div>
                     </div>
                     <button type="submit" className="w-full bg-black text-white py-4 rounded-xl font-bold text-sm tracking-wide shadow-lg hover:bg-gray-800 active:scale-[0.98] transition-all cursor-pointer">ENREGISTRER</button>
                 </form>

@@ -1,12 +1,12 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import "./globals.css"; // <--- Vérifie que cette ligne est bien là !
+import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
   title: "Stock Filaments",
-  description: "Gestion de stock",
+  description: "Gestion de stock simplifiée",
 };
 
 export default function RootLayout({
@@ -16,8 +16,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="fr">
-      {/* On force la couleur de fond ici pour éviter les bugs d'affichage */}
-      <body className={`${inter.className} bg-slate-50 dark:bg-[#1A1A2E] text-slate-900 dark:text-[#EAEAEA]`}>
+      {/* Fond gris clair Apple et texte sombre par défaut */}
+      <body className={`${inter.className} bg-[#F5F5F7] text-[#1D1D1F] antialiased`}>
         {children}
       </body>
     </html>
