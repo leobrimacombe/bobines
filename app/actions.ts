@@ -72,8 +72,23 @@ export async function updateSpool(formData: FormData) {
     color_name: formData.get('color') as string,
     color_hex: formData.get('color_hex') as string,
     weight_initial: parseInt(formData.get('initial_weight') as string),
+    // On ne modifie pas le spool_number ici pour garder la traçabilité
   }
 
   await supabase.from('spools').update(updates).eq('id', id)
+  revalidatePath('/')
+}
+
+export async function updateThreshold(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const threshold = parseInt(formData.get('threshold') as string)
+  
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert({ user_id: user.id, low_stock_threshold: threshold })
+
   revalidatePath('/')
 }
