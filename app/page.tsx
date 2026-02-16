@@ -22,7 +22,6 @@ export default function Home() {
 
   const fetchBobines = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return router.push('/login')
     setUser(user)
 
     const { data } = await supabase
