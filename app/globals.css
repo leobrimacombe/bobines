@@ -1,19 +1,29 @@
 @import "tailwindcss";
 
+/* --- LA LIGNE MAGIQUE POUR LE MODE SOMBRE MANUEL --- */
+/* Cela dit à Tailwind : "N'active le mode sombre que si je mets la classe .dark" */
+@variant dark (&:where(.dark, .dark *));
+
+/* --- THÈME & STYLES --- */
+@theme {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
 :root {
-  /* On force le fond GRIS CLAIR Apple par défaut */
-  --background: #F5F5F7;
+  /* Couleur de fond par défaut (Mode Clair Apple) */
+  --background: #F5F5F7; 
   --foreground: #1D1D1F;
 }
 
-/* On applique ces couleurs au body */
+/* Appliquer les couleurs */
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* On supprime les flèches moches des inputs nombres */
+/* Nettoyage des inputs nombres */
 @layer utilities {
   input[type="number"]::-webkit-inner-spin-button,
   input[type="number"]::-webkit-outer-spin-button {

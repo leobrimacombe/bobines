@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '../utils/supabase/client'
 import { addSpool, deleteSpool, consumeSpool, updateSpool, updateThreshold } from './actions'
-import { Search, Plus, Trash2, Disc3, LogOut, X, Edit2, Minus, Settings, Package, Euro, AlertTriangle, Check, History, Calculator, Calendar, Droplets } from 'lucide-react'
+import { Search, Plus, Trash2, Disc3, LogOut, X, Edit2, Minus, Settings, Package, Euro, AlertTriangle, Check, Moon, Sun } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 // --- DONNÉES ---
@@ -27,11 +27,12 @@ const BAMBU_COLORS = [
   { name: 'Argent', ref: '10102', hex: '#C0C0C0' }, { name: 'Or', ref: '10103', hex: '#FFD700' }
 ];
 
+// --- COMPOSANT INPUT ---
 const CustomInput = ({ label, name, value, setValue, list, placeholder, onSelect, type = "text", step }: any) => {
   const [showList, setShowList] = useState(false);
   return (
     <div className="group">
-      <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">{label}</label>
+      <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide ml-1">{label}</label>
       <div className="relative">
         <input 
           type={type} step={step} name={name} value={value} 
@@ -39,18 +40,19 @@ const CustomInput = ({ label, name, value, setValue, list, placeholder, onSelect
           onFocus={() => { if(list) setShowList(true); }}
           onBlur={() => setTimeout(() => setShowList(false), 200)}
           placeholder={placeholder} autoComplete="off"
-          className="w-full bg-gray-50/50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium placeholder:text-gray-400 cursor-pointer" 
+          // Style adaptatif Jour/Nuit
+          className="w-full bg-gray-50/50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-4 rounded-xl outline-none focus:bg-white dark:focus:bg-[#3A3A3C] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium placeholder:text-gray-400 cursor-pointer" 
           required 
         />
         {showList && list && list.length > 0 && (
-          <ul className="absolute z-50 w-full mt-2 bg-white/80 backdrop-blur-xl border border-gray-200 rounded-xl max-h-48 overflow-y-auto shadow-xl animate-fade">
+          <ul className="absolute z-50 w-full mt-2 bg-white/90 dark:bg-[#2C2C2E]/90 backdrop-blur-xl border border-gray-200 dark:border-gray-700 rounded-xl max-h-48 overflow-y-auto shadow-xl animate-fade">
             {list.filter((item: any) => typeof item === 'string' ? item.toLowerCase().includes(value.toLowerCase()) : (item.name.toLowerCase().includes(value.toLowerCase()) || item.ref.includes(value))).map((item: any, index: number) => {
                const isString = typeof item === 'string';
                const display = isString ? item : item.name;
                const subtext = isString ? null : `#${item.ref}`;
                const hex = isString ? null : item.hex;
                return (
-                  <li key={index} onClick={() => { setValue(display); setShowList(false); if (onSelect) onSelect(item); }} className="p-3 hover:bg-blue-50 cursor-pointer text-sm border-b border-gray-100 last:border-0 flex items-center justify-between text-gray-800 transition-colors">
+                  <li key={index} onClick={() => { setValue(display); setShowList(false); if (onSelect) onSelect(item); }} className="p-3 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer text-sm border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center justify-between text-gray-800 dark:text-gray-200 transition-colors">
                     <div className="flex items-center gap-3">{hex && <div className="w-5 h-5 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: hex }}></div>}<span className="font-medium">{display}</span></div>
                     {subtext && <span className="text-gray-400 text-xs font-mono">{subtext}</span>}
                   </li>
@@ -65,53 +67,57 @@ const CustomInput = ({ label, name, value, setValue, list, placeholder, onSelect
 
 export default function Home() {
   const [bobines, setBobines] = useState<any[]>([])
-  const [history, setHistory] = useState<any[]>([]) // Nouvel état pour l'historique
   const [user, setUser] = useState<any>(null)
-  const [activeTab, setActiveTab] = useState<'stock' | 'history' | 'alerte'>('stock')
+  const [activeTab, setActiveTab] = useState<'stock' | 'alerte'>('stock')
+  const [theme, setTheme] = useState<'light' | 'dark'>('light'); // Thème clair par défaut pour le style Apple
   
-  // Settings
   const [lowStockThreshold, setLowStockThreshold] = useState(200)
   const [similarStockThreshold, setSimilarStockThreshold] = useState(2)
   
-  // Filters & Tools
   const [search, setSearch] = useState('')
   const [filterMaterial, setFilterMaterial] = useState('Tous')
-  const [showCalculator, setShowCalculator] = useState(false)
-  const [calcWeight, setCalcWeight] = useState('')
-  const [calcMaterial, setCalcMaterial] = useState('PLA')
   
-  // Modals
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingBobine, setEditingBobine] = useState<any>(null)
   const [addQuantity, setAddQuantity] = useState(1)
 
-  // Form Fields
   const [brandInput, setBrandInput] = useState('')
   const [materialInput, setMaterialInput] = useState('')
   const [colorInput, setColorInput] = useState('')
   const [colorHex, setColorHex] = useState('#000000')
   const [priceInput, setPriceInput] = useState('')
   const [weightInput, setWeightInput] = useState('1000')
-  const [dateInput, setDateInput] = useState(new Date().toISOString().split('T')[0])
 
   const supabase = createClient()
   const router = useRouter()
+
+  // --- GESTION THÈME (V4 SELECTOR) ---
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
+    if (savedTheme) {
+        setTheme(savedTheme);
+        if (savedTheme === 'dark') document.documentElement.classList.add('dark');
+        else document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
+  const toggleTheme = () => {
+      const newTheme = theme === 'light' ? 'dark' : 'light';
+      setTheme(newTheme);
+      localStorage.setItem('theme', newTheme);
+      if (newTheme === 'dark') document.documentElement.classList.add('dark');
+      else document.documentElement.classList.remove('dark');
+  };
 
   const fetchData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return router.push('/login')
     setUser(user)
 
-    // Bobines
     const { data: spools } = await supabase.from('spools').select('*').order('created_at', { ascending: false })
     setBobines(spools || [])
 
-    // Historique
-    const { data: logs } = await supabase.from('consumption_logs').select('*').order('created_at', { ascending: false }).limit(50)
-    setHistory(logs || [])
-
-    // Settings
     const { data: settings } = await supabase.from('user_settings').select('*').single()
     if (settings) {
       setLowStockThreshold(settings.low_stock_threshold || 200)
@@ -126,7 +132,6 @@ export default function Home() {
     router.push('/login')
   }
 
-  // --- LOGIQUE ---
   const filteredBobines = bobines.filter(b => {
     const matchSearch = b.brand.toLowerCase().includes(search.toLowerCase()) || 
                         (b.color_name && b.color_name.toLowerCase().includes(search.toLowerCase())) ||
@@ -136,15 +141,6 @@ export default function Home() {
   })
 
   const totalValue = bobines.reduce((acc, b) => acc + (b.price || 0), 0);
-
-  // Vérification de l'âge (6 mois = warning)
-  const isOldSpool = (dateString: string) => {
-      if(!dateString) return false;
-      const openDate = new Date(dateString);
-      const sixMonthsAgo = new Date();
-      sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
-      return openDate < sixMonthsAgo;
-  }
 
   const getLowStockSimilarGroups = () => {
     const groups: {[key: string]: number} = {};
@@ -162,7 +158,7 @@ export default function Home() {
   const materials = ['Tous', ...new Set(bobines.map(b => b.material).filter(Boolean))]
 
   const resetFields = () => {
-      setBrandInput(''); setMaterialInput(''); setColorInput(''); setColorHex('#000000'); setPriceInput(''); setWeightInput('1000'); setAddQuantity(1); setDateInput(new Date().toISOString().split('T')[0]);
+      setBrandInput(''); setMaterialInput(''); setColorInput(''); setColorHex('#000000'); setPriceInput(''); setWeightInput('1000'); setAddQuantity(1);
   }
 
   const loadEditFields = (bobine: any) => {
@@ -173,14 +169,13 @@ export default function Home() {
       setColorHex(bobine.color_hex || '#000000');
       setPriceInput(bobine.price);
       setWeightInput(bobine.weight_initial);
-      setDateInput(bobine.date_opened || new Date().toISOString().split('T')[0]);
       setIsEditModalOpen(true);
   }
 
-  if (!user) return <div className="bg-[#F5F5F7] min-h-screen"></div>
+  if (!user) return <div className="bg-[#F5F5F7] dark:bg-black min-h-screen"></div>
 
   return (
-    <div className="min-h-screen bg-[#F5F5F7] text-[#1D1D1F] font-sans pb-20 selection:bg-blue-100 selection:text-blue-900">
+    <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-[#1D1D1F] dark:text-[#F5F5F7] font-sans pb-20 selection:bg-blue-100 dark:selection:bg-blue-900 selection:text-blue-900 transition-colors duration-300">
       <style jsx global>{`
         @keyframes modalPop { 0% { opacity: 0; transform: scale(0.95); } 100% { opacity: 1; transform: scale(1); } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -188,32 +183,37 @@ export default function Home() {
         .animate-fade { animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
       `}</style>
 
-      <header className="bg-white/70 backdrop-blur-xl border-b border-gray-200/50 sticky top-0 z-30 transition-all">
+      {/* --- HEADER --- */}
+      <header className="bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0 z-30 transition-all">
         <div className="max-w-7xl mx-auto px-6 py-4 flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-black text-white p-2 rounded-xl shadow-lg shadow-black/10">
+            <div className="bg-black dark:bg-white text-white dark:text-black p-2 rounded-xl shadow-lg shadow-black/10 dark:shadow-white/10">
               <Disc3 size={24} className="animate-[spin_12s_linear_infinite]" />
             </div>
-            <h1 className="text-lg font-semibold tracking-tight text-gray-900 hidden sm:block">Stock Filaments</h1>
+            <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white hidden sm:block">Stock Filaments</h1>
           </div>
 
-          <nav className="bg-gray-200/50 p-1 rounded-lg flex items-center">
-            <button onClick={() => setActiveTab('stock')} className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'stock' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}>
-              <Package size={14} /> <span className="hidden xs:inline">Stock</span>
+          <nav className="bg-gray-200/50 dark:bg-gray-800/50 p-1 rounded-lg flex items-center">
+            <button 
+              onClick={() => setActiveTab('stock')}
+              className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'stock' ? 'bg-white dark:bg-[#2C2C2E] text-black dark:text-white shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-gray-300'}`}
+            >
+              <Package size={14} /> Stock
             </button>
-            <button onClick={() => setActiveTab('history')} className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'history' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}>
-              <History size={14} /> <span className="hidden xs:inline">Historique</span>
-            </button>
-            <button onClick={() => setActiveTab('alerte')} className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'alerte' ? 'bg-white text-black shadow-sm' : 'text-gray-500 hover:text-black'}`}>
-              <Settings size={14} /> <span className="hidden xs:inline">Config</span>
+            <button 
+              onClick={() => setActiveTab('alerte')}
+              className={`px-4 py-1.5 rounded-[6px] text-xs font-semibold transition-all duration-200 flex items-center gap-2 cursor-pointer ${activeTab === 'alerte' ? 'bg-white dark:bg-[#2C2C2E] text-black dark:text-white shadow-sm' : 'text-gray-500 hover:text-black dark:hover:text-gray-300'}`}
+            >
+              <Settings size={14} /> Alertes
             </button>
           </nav>
 
           <div className="flex items-center gap-3">
-            <span className="text-xs font-medium text-gray-400 hidden md:block">
-              {user.user_metadata?.username || (user.email ? user.email.split('@')[0] : 'Utilisateur')}
-            </span>
-            <button onClick={handleSignOut} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all cursor-pointer">
+             {/* THEME TOGGLE */}
+            <button onClick={toggleTheme} className="p-2 text-gray-500 hover:text-black dark:text-gray-400 dark:hover:text-yellow-400 transition-colors cursor-pointer">
+                {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            <button onClick={handleSignOut} className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all cursor-pointer">
                 <LogOut size={20} />
             </button>
           </div>
@@ -226,107 +226,64 @@ export default function Home() {
           <>
             {/* --- STATS --- */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Valeur Totale</p>
-                <p className="text-3xl font-semibold text-gray-900 tracking-tight">{totalValue.toFixed(2)} €</p>
+              <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <p className="text-gray-400 dark:text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Valeur Totale</p>
+                <p className="text-3xl font-semibold text-gray-900 dark:text-white tracking-tight">{totalValue.toFixed(2)} €</p>
               </div>
-              <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
-                <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mb-1">Alertes Poids</p>
+              <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-[0_2px_8px_rgba(0,0,0,0.04)]">
+                <p className="text-gray-400 dark:text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Alertes Poids</p>
                 <div className="flex items-baseline gap-2">
                     <p className="text-3xl font-semibold text-orange-500 tracking-tight">{bobines.filter(b => (b.weight_initial - (b.weight_used || 0)) < lowStockThreshold).length}</p>
-                    <span className="text-xs text-orange-500 font-medium bg-orange-50 px-2 py-0.5 rounded-full">{'<'} {lowStockThreshold}g</span>
+                    <span className="text-xs text-orange-500 font-medium bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-full">{'<'} {lowStockThreshold}g</span>
                 </div>
               </div>
               
               {similarAlerts.length > 0 ? (
-                <div className="lg:col-span-2 bg-orange-50/50 p-6 rounded-2xl border border-orange-100/50 flex flex-col justify-center">
+                <div className="lg:col-span-2 bg-orange-50/50 dark:bg-orange-900/10 p-6 rounded-2xl border border-orange-100/50 dark:border-orange-900/30 flex flex-col justify-center">
                    <div className="flex items-center gap-2 mb-3">
                        <AlertTriangle size={16} className="text-orange-500" />
-                       <p className="text-orange-600 text-xs font-bold uppercase tracking-wide">Réapprovisionnement conseillé</p>
+                       <p className="text-orange-600 dark:text-orange-400 text-xs font-bold uppercase tracking-wide">Réapprovisionnement conseillé</p>
                    </div>
                    <div className="flex flex-wrap gap-2">
                       {similarAlerts.map((a, i) => (
-                        <span key={i} className="bg-white text-orange-600 border border-orange-100 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm">
+                        <span key={i} className="bg-white dark:bg-[#2C2C2E] text-orange-600 dark:text-orange-300 border border-orange-100 dark:border-orange-900/30 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm">
                           {a.count}x {a.brand} {a.material} {a.color}
                         </span>
                       ))}
                    </div>
                 </div>
               ) : (
-                 <button onClick={() => setShowCalculator(!showCalculator)} className="lg:col-span-2 bg-white p-6 rounded-2xl border border-dashed border-gray-300 hover:border-blue-500 hover:bg-blue-50/50 transition-all flex items-center justify-center gap-3 group active:scale-[0.99] shadow-[0_2px_8px_rgba(0,0,0,0.02)] cursor-pointer">
-                    <div className="bg-gray-100 group-hover:bg-blue-500 p-2 rounded-full transition-colors">
-                        <Calculator size={20} className="text-gray-500 group-hover:text-white transition-colors" />
+                 <button onClick={() => { resetFields(); setIsModalOpen(true); }} className="lg:col-span-2 bg-white dark:bg-[#1C1C1E] p-6 rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/10 transition-all flex items-center justify-center gap-3 group active:scale-[0.99] shadow-[0_2px_8px_rgba(0,0,0,0.02)] cursor-pointer">
+                    <div className="bg-gray-100 dark:bg-[#2C2C2E] group-hover:bg-blue-500 p-2 rounded-full transition-colors">
+                        <Plus size={20} className="text-gray-500 group-hover:text-white transition-colors" />
                     </div>
-                    <span className="text-sm font-semibold text-gray-500 group-hover:text-blue-600">Calculateur de Projet</span>
+                    <span className="text-sm font-semibold text-gray-500 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400">Ajouter une nouvelle bobine</span>
                  </button>
               )}
             </div>
 
-            {/* --- CALCULATEUR DE PROJET (EXPANDABLE) --- */}
-            {showCalculator && (
-                <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-xl animate-fade mb-6">
-                    <div className="flex justify-between items-center mb-6">
-                        <h3 className="font-bold text-lg text-gray-900 flex items-center gap-2"><Calculator size={20} className="text-blue-500"/> Calculateur de coût</h3>
-                        <button onClick={() => setShowCalculator(false)}><X size={20} className="text-gray-400 hover:text-black cursor-pointer"/></button>
-                    </div>
-                    <div className="flex flex-col md:flex-row gap-4 items-end">
-                        <div className="flex-1 w-full">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Poids du modèle (g)</label>
-                            <input type="number" value={calcWeight} onChange={(e) => setCalcWeight(e.target.value)} className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none font-bold cursor-pointer" placeholder="ex: 350" />
-                        </div>
-                        <div className="flex-1 w-full">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1.5 uppercase">Matière</label>
-                            <select value={calcMaterial} onChange={(e) => setCalcMaterial(e.target.value)} className="w-full bg-gray-50 border border-gray-200 p-3 rounded-xl outline-none font-bold cursor-pointer">
-                                {SUGGESTED_MATERIALS.map(m => <option key={m} value={m}>{m}</option>)}
-                            </select>
-                        </div>
-                    </div>
-                    
-                    {calcWeight && (
-                        <div className="mt-6 space-y-3">
-                            <p className="text-xs font-medium text-gray-400 uppercase tracking-widest">Bobines compatibles :</p>
-                            {bobines.filter(b => b.material === calcMaterial && (b.weight_initial - (b.weight_used || 0)) >= parseInt(calcWeight)).length === 0 ? (
-                                <p className="text-sm text-red-500 font-medium italic">Aucune bobine de {calcMaterial} n'a assez de filament.</p>
-                            ) : (
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                                    {bobines.filter(b => b.material === calcMaterial && (b.weight_initial - (b.weight_used || 0)) >= parseInt(calcWeight)).map(b => (
-                                        <div key={b.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-100">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: b.color_hex }}></div>
-                                                <span className="text-xs font-bold text-gray-800">{b.brand} {b.color_name}</span>
-                                            </div>
-                                            <span className="text-xs font-bold text-blue-600">
-                                                {b.price > 0 ? `${((b.price / b.weight_initial) * parseInt(calcWeight)).toFixed(2)} €` : 'N/A'}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-                    )}
-                </div>
+            {similarAlerts.length > 0 && (
+               <button onClick={() => { resetFields(); setIsModalOpen(true); }} className="w-full bg-black dark:bg-white text-white dark:text-black p-4 rounded-xl shadow-lg shadow-black/10 dark:shadow-white/5 hover:bg-gray-900 dark:hover:bg-gray-100 transition-all flex items-center justify-center gap-3 active:scale-[0.99] cursor-pointer">
+                  <Plus size={20} />
+                  <span className="text-sm font-semibold">Ajouter une bobine</span>
+               </button>
             )}
 
             {/* --- RECHERCHE --- */}
             <div className="flex flex-col md:flex-row gap-4 items-center">
-              {/* Le bouton Ajouter est là si pas d'alerte, sinon plus haut */}
-              <button onClick={() => { resetFields(); setIsModalOpen(true); }} className="md:w-auto w-full bg-black text-white px-6 py-3.5 rounded-xl font-bold text-sm shadow-lg hover:bg-gray-800 active:scale-[0.98] transition-all cursor-pointer flex items-center justify-center gap-2">
-                  <Plus size={18} /> Ajouter
-              </button>
-
               <div className="relative flex-1 w-full group">
                 <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-blue-500 transition-colors" size={18} />
                 <input 
                     type="text" 
                     placeholder="Rechercher une bobine..." 
-                    className="w-full bg-white border border-gray-200 rounded-xl py-3.5 pl-12 pr-4 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all shadow-sm text-sm font-medium cursor-pointer" 
+                    className="w-full bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-gray-800 rounded-xl py-3.5 pl-12 pr-4 focus:ring-2 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all shadow-sm text-sm font-medium text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-gray-600 cursor-pointer" 
                     value={search} 
                     onChange={(e) => setSearch(e.target.value)} 
                 />
               </div>
               <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide w-full md:w-auto">
                 {materials.map(m => (
-                  <button key={m} onClick={() => setFilterMaterial(m)} className={`px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all active:scale-95 cursor-pointer ${filterMaterial === m ? 'bg-black text-white shadow-lg shadow-black/10' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}>{m}</button>
+                  <button key={m} onClick={() => setFilterMaterial(m)} className={`px-5 py-2.5 rounded-xl text-xs font-semibold tracking-wide transition-all active:scale-95 cursor-pointer ${filterMaterial === m ? 'bg-black dark:bg-white text-white dark:text-black shadow-lg shadow-black/10' : 'bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-[#2C2C2E]'}`}>{m}</button>
                 ))}
               </div>
             </div>
@@ -338,56 +295,48 @@ export default function Home() {
                 const reste = poidsInitial - (bobine.weight_used || 0);
                 const pourcent = Math.max(0, Math.min(100, (reste / poidsInitial) * 100));
                 const isLow = reste < lowStockThreshold;
-                const isOld = isOldSpool(bobine.date_opened);
                 
                 return (
-                  <div key={bobine.id} className={`bg-white rounded-2xl border overflow-hidden hover:shadow-xl hover:shadow-black/5 transition-all duration-300 flex flex-col group hover:-translate-y-1 ${isLow ? 'border-orange-200 shadow-orange-50' : 'border-gray-100 shadow-sm'}`}>
+                  <div key={bobine.id} className={`bg-white dark:bg-[#1C1C1E] rounded-2xl border overflow-hidden hover:shadow-xl hover:shadow-black/5 dark:hover:shadow-white/5 transition-all duration-300 flex flex-col group hover:-translate-y-1 ${isLow ? 'border-orange-200 dark:border-orange-900/50 shadow-orange-50' : 'border-gray-100 dark:border-gray-800 shadow-sm'}`}>
                     
                     <div className="h-16 w-full relative flex items-end p-4 pb-2" style={{ backgroundColor: bobine.color_hex || '#F5F5F7' }}>
-                        <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm border border-black/5">
-                            <span className="text-[10px] font-bold text-gray-900 tracking-tight">#{bobine.spool_number}</span>
+                        <div className="absolute top-3 left-3 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm border border-black/5 dark:border-white/10">
+                            <span className="text-[10px] font-bold text-gray-900 dark:text-white tracking-tight">#{bobine.spool_number}</span>
                         </div>
-                        <div className="absolute top-3 right-3 flex gap-2">
-                            {isOld && (
-                                <div className="bg-blue-50/90 backdrop-blur-md p-1 rounded-lg shadow-sm border border-blue-100 text-blue-500" title="Ouvert depuis > 6 mois">
-                                    <Droplets size={12} />
-                                </div>
-                            )}
-                            {bobine.price > 0 && (
-                               <div className="bg-white/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm border border-black/5 flex items-center gap-1">
-                                  <span className="text-[10px] font-bold text-gray-900">{bobine.price} €</span>
-                               </div>
-                            )}
-                        </div>
+                        {bobine.price > 0 && (
+                           <div className="absolute top-3 right-3 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm border border-black/5 dark:border-white/10 flex items-center gap-1">
+                              <span className="text-[10px] font-bold text-gray-900 dark:text-white">{bobine.price} €</span>
+                           </div>
+                        )}
                         <div className="absolute inset-0 bg-gradient-to-b from-black/5 to-transparent pointer-events-none"></div>
                     </div>
 
                     <div className="p-5 flex-1 flex flex-col">
                       <div className="flex justify-between items-start mb-4">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-bold text-lg leading-tight mb-1 truncate text-gray-900">{bobine.brand}</h3>
+                          <h3 className="font-bold text-lg leading-tight mb-1 truncate text-gray-900 dark:text-white">{bobine.brand}</h3>
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="bg-gray-100 text-gray-600 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border border-gray-200">{bobine.material}</span>
-                            <span className="text-xs text-gray-500 truncate">{bobine.color_name}</span>
+                            <span className="bg-gray-100 dark:bg-[#2C2C2E] text-gray-600 dark:text-gray-300 text-[10px] font-bold uppercase px-2 py-0.5 rounded-md border border-gray-200 dark:border-gray-700">{bobine.material}</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 truncate">{bobine.color_name}</span>
                           </div>
                         </div>
                         
                         <div className="flex gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                          <button onClick={() => loadEditFields(bobine)} className="text-gray-400 hover:text-blue-600 p-2 rounded-lg hover:bg-blue-50 transition-colors cursor-pointer"><Edit2 size={16} /></button>
+                          <button onClick={() => loadEditFields(bobine)} className="text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 p-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors cursor-pointer"><Edit2 size={16} /></button>
                           <form action={async (formData) => { if (window.confirm(`Supprimer #${bobine.spool_number} ?`)) { await deleteSpool(formData); fetchData(); } }}>
                             <input type="hidden" name="id" value={bobine.id} />
-                            <button className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"><Trash2 size={16} /></button>
+                            <button className="text-gray-400 hover:text-red-500 dark:hover:text-red-400 p-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors cursor-pointer"><Trash2 size={16} /></button>
                           </form>
                         </div>
                       </div>
                       
                       <div className="mb-5">
                          <div className="flex justify-between items-baseline mb-2">
-                            <span className={`text-2xl font-bold tracking-tight ${isLow ? 'text-orange-500' : 'text-gray-900'}`}>{reste}<span className="text-sm font-medium text-gray-400 ml-0.5">g</span></span>
+                            <span className={`text-2xl font-bold tracking-tight ${isLow ? 'text-orange-500' : 'text-gray-900 dark:text-white'}`}>{reste}<span className="text-sm font-medium text-gray-400 ml-0.5">g</span></span>
                             <span className="text-gray-400 text-xs font-medium">sur {poidsInitial}g</span>
                          </div>
-                         <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-                            <div className={`h-full rounded-full transition-all duration-1000 ease-out ${isLow ? 'bg-orange-500' : 'bg-gray-900'}`} style={{ width: `${pourcent}%` }}></div>
+                         <div className="w-full bg-gray-100 dark:bg-[#2C2C2E] rounded-full h-2 overflow-hidden">
+                            <div className={`h-full rounded-full transition-all duration-1000 ease-out ${isLow ? 'bg-orange-500' : 'bg-gray-900 dark:bg-white'}`} style={{ width: `${pourcent}%` }}></div>
                          </div>
                       </div>
                       
@@ -403,12 +352,11 @@ export default function Home() {
                           const input = document.getElementById(`input-${bobine.id}`) as HTMLInputElement; 
                           if (input) input.value = ''; 
                       }} className="mt-auto flex gap-2">
-                        {/* INPUT PROJET NAME CACHÉ DANS CE MODE SIMPLE, MAIS POSSIBLE D'AJOUTER */}
                         <div className="relative flex-1">
-                            <input id={`input-${bobine.id}`} type="number" name="amount" placeholder="Conso." className="w-full bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-3 text-sm outline-none focus:bg-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 font-medium transition-all cursor-pointer" required />
+                            <input id={`input-${bobine.id}`} type="number" name="amount" placeholder="Conso." className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl py-2.5 px-3 text-sm outline-none focus:bg-white dark:focus:bg-[#3A3A3C] focus:border-blue-500 font-medium transition-all text-gray-900 dark:text-white placeholder:text-gray-400 cursor-pointer" required />
                             <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold pointer-events-none">g</span>
                         </div>
-                        <button type="submit" className="bg-gray-900 hover:bg-black text-white px-4 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"><Check size={16}/></button>
+                        <button type="submit" className="bg-gray-900 hover:bg-black dark:bg-white dark:text-black dark:hover:bg-gray-200 text-white px-4 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"><Check size={16}/></button>
                       </form>
                     </div>
                   </div>
@@ -416,67 +364,38 @@ export default function Home() {
               })}
             </div>
           </>
-        ) : activeTab === 'history' ? (
-          /* --- HISTORIQUE --- */
-          <div className="max-w-3xl mx-auto space-y-6">
-             <div className="bg-white p-8 rounded-[2.5rem] border border-gray-200 shadow-xl animate-fade">
-                <h2 className="text-2xl font-bold tracking-tight mb-6 text-gray-900 flex items-center gap-3"><History className="text-blue-500" /> Historique des impressions</h2>
-                
-                {history.length === 0 ? (
-                    <p className="text-gray-400 text-center py-10 italic">Aucune impression enregistrée.</p>
-                ) : (
-                    <div className="relative border-l-2 border-gray-100 ml-4 space-y-8 py-2">
-                        {history.map((log) => (
-                            <div key={log.id} className="relative pl-8">
-                                <div className="absolute -left-[9px] top-1 w-4 h-4 bg-white border-2 border-blue-500 rounded-full"></div>
-                                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-1">
-                                    <h4 className="font-bold text-gray-900 text-lg">{log.project_name}</h4>
-                                    <span className="text-xs text-gray-400 font-medium">{new Date(log.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}</span>
-                                </div>
-                                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100 flex items-center justify-between">
-                                    <div>
-                                        <p className="text-sm font-semibold text-gray-700">{log.spool_name}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-xl font-bold text-blue-600">-{log.amount}g</p>
-                                    </div>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
-                )}
-             </div>
-          </div>
         ) : (
           /* --- CONFIGURATION --- */
-          <div className="max-w-xl mx-auto bg-white p-10 rounded-[2.5rem] border border-gray-200 shadow-xl animate-fade">
-            <h2 className="text-2xl font-bold tracking-tight mb-2 text-gray-900">Préférences</h2>
+          <div className="max-w-xl mx-auto bg-white dark:bg-[#1C1C1E] p-10 rounded-[2.5rem] border border-gray-200 dark:border-gray-800 shadow-xl animate-fade">
+            <h2 className="text-2xl font-bold tracking-tight mb-2 text-gray-900 dark:text-white">Préférences</h2>
             <p className="text-gray-500 mb-8 text-sm">Gérez vos seuils d'alertes automatiques.</p>
             
             <form action={async (formData) => { await updateThreshold(formData); fetchData(); alert('Préférences mises à jour.'); }} className="space-y-8">
+              
               <div className="space-y-6">
                   <div>
-                    <label className="flex justify-between text-sm font-medium text-gray-700 mb-4">
+                    <label className="flex justify-between text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">
                         <span>Alerte Poids Faible</span>
-                        <span className="font-bold text-blue-600">{lowStockThreshold}g</span>
+                        <span className="font-bold text-blue-600 dark:text-blue-400">{lowStockThreshold}g</span>
                     </label>
-                    <input type="range" name="threshold" min="50" max="500" step="10" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black" />
+                    <input type="range" name="threshold" min="50" max="500" step="10" value={lowStockThreshold} onChange={(e) => setLowStockThreshold(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white" />
                   </div>
 
-                  <div className="pt-6 border-t border-gray-100">
-                    <label className="block text-sm font-medium text-gray-700 mb-4">Alerte Stock Critique (Doublons)</label>
-                    <div className="flex items-center justify-between bg-gray-50 p-4 rounded-2xl border border-gray-200">
-                        <span className="text-xs text-gray-500 max-w-[200px]">Alerter si une référence possède moins de :</span>
+                  <div className="pt-6 border-t border-gray-100 dark:border-gray-800">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-4">Alerte Stock Critique (Doublons)</label>
+                    <div className="flex items-center justify-between bg-gray-50 dark:bg-[#2C2C2E] p-4 rounded-2xl border border-gray-200 dark:border-gray-700">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 max-w-[200px]">Alerter si une référence possède moins de :</span>
                         <div className="flex items-center gap-4">
-                            <button type="button" onClick={() => setSimilarStockThreshold(Math.max(1, similarStockThreshold - 1))} className="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded-full hover:bg-gray-100 transition-colors shadow-sm cursor-pointer"><Minus size={14}/></button>
-                            <span className="text-xl font-bold text-gray-900 w-4 text-center">{similarStockThreshold}</span>
-                            <button type="button" onClick={() => setSimilarStockThreshold(similarStockThreshold + 1)} className="w-8 h-8 flex items-center justify-center bg-white border border-gray-200 rounded-full hover:bg-gray-100 transition-colors shadow-sm cursor-pointer"><Plus size={14}/></button>
+                            <button type="button" onClick={() => setSimilarStockThreshold(Math.max(1, similarStockThreshold - 1))} className="w-8 h-8 flex items-center justify-center bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors shadow-sm cursor-pointer text-gray-900 dark:text-white"><Minus size={14}/></button>
+                            <span className="text-xl font-bold text-gray-900 dark:text-white w-4 text-center">{similarStockThreshold}</span>
+                            <button type="button" onClick={() => setSimilarStockThreshold(similarStockThreshold + 1)} className="w-8 h-8 flex items-center justify-center bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-gray-700 rounded-full hover:bg-gray-100 dark:hover:bg-[#2C2C2E] transition-colors shadow-sm cursor-pointer text-gray-900 dark:text-white"><Plus size={14}/></button>
                             <input type="hidden" name="similar_threshold" value={similarStockThreshold} />
                         </div>
                     </div>
                   </div>
               </div>
-              <button type="submit" className="w-full bg-black hover:bg-gray-800 text-white py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg active:scale-[0.98] transition-all cursor-pointer">ENREGISTRER</button>
+
+              <button type="submit" className="w-full bg-black dark:bg-white hover:bg-gray-800 dark:hover:bg-gray-200 text-white dark:text-black py-4 rounded-2xl font-bold text-sm tracking-wide shadow-lg active:scale-[0.98] transition-all cursor-pointer">ENREGISTRER</button>
             </form>
           </div>
         )}
@@ -484,11 +403,11 @@ export default function Home() {
 
       {/* --- MODALES --- */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-gray-900/20 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade">
-            <div className="bg-white w-full max-w-lg p-8 rounded-[2rem] shadow-2xl relative animate-modal max-h-[90vh] overflow-y-auto border border-gray-100">
-                <div className="flex justify-between items-center mb-8 sticky top-0 bg-white z-10 pb-4 border-b border-gray-50">
-                    <h3 className="font-bold text-2xl text-gray-900 tracking-tight">Ajouter une bobine</h3>
-                    <button onClick={() => setIsModalOpen(false)} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors cursor-pointer"><X size={20} className="text-gray-600" /></button>
+        <div className="fixed inset-0 bg-gray-900/20 dark:bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade">
+            <div className="bg-white dark:bg-[#1C1C1E] w-full max-w-lg p-8 rounded-[2rem] shadow-2xl relative animate-modal max-h-[90vh] overflow-y-auto border border-gray-100 dark:border-gray-800">
+                <div className="flex justify-between items-center mb-8 sticky top-0 bg-white dark:bg-[#1C1C1E] z-10 pb-4 border-b border-gray-50 dark:border-gray-800">
+                    <h3 className="font-bold text-2xl text-gray-900 dark:text-white tracking-tight">Ajouter une bobine</h3>
+                    <button onClick={() => setIsModalOpen(false)} className="bg-gray-100 dark:bg-[#2C2C2E] hover:bg-gray-200 dark:hover:bg-[#3A3A3C] p-2 rounded-full transition-colors cursor-pointer"><X size={20} className="text-gray-600 dark:text-gray-400" /></button>
                 </div>
                 
                 <form action={async (formData) => { await addSpool(formData); setIsModalOpen(false); fetchData(); }} className="space-y-5">
@@ -499,8 +418,8 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-4">
                         <CustomInput label="Matière" name="material" value={materialInput} setValue={setMaterialInput} list={SUGGESTED_MATERIALS} placeholder="ex: PLA" />
                         <div>
-                           <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Poids (g)</label>
-                           <input type="number" name="initial_weight" defaultValue="1000" className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" required />
+                           <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide ml-1">Poids (g)</label>
+                           <input type="number" name="initial_weight" defaultValue="1000" className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-4 rounded-xl outline-none focus:bg-white dark:focus:bg-[#3A3A3C] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" required />
                         </div>
                     </div>
 
@@ -510,31 +429,25 @@ export default function Home() {
                       placeholder="Nom de la couleur" onSelect={(item: any) => { if(item.hex) setColorHex(item.hex); }}
                     />
                     
-                    <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                       <label className="text-xs font-medium text-gray-500">Aperçu :</label>
+                    <div className="flex items-center gap-4 bg-gray-50 dark:bg-[#2C2C2E] p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Aperçu :</label>
                        <div className="h-6 w-6 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: colorHex }}></div>
                        <input type="color" name="color_hex" value={colorHex} onChange={(e) => setColorHex(e.target.value)} className="opacity-0 w-0 h-0" id="colorPicker" />
-                       <label htmlFor="colorPicker" className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">Modifier</label>
+                       <label htmlFor="colorPicker" className="text-xs text-blue-600 dark:text-blue-400 font-medium cursor-pointer hover:underline">Modifier</label>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Prix (€)</label>
-                            <input type="number" step="0.01" name="price" placeholder="0.00" className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
-                        </div>
-                        <div>
-                            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Date d'ouverture</label>
-                            <input type="date" name="date_opened" value={dateInput} onChange={(e) => setDateInput(e.target.value)} className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
-                        </div>
+                    <div>
+                        <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide ml-1">Prix (€)</label>
+                        <input type="number" step="0.01" name="price" placeholder="0.00" className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-4 rounded-xl outline-none focus:bg-white dark:focus:bg-[#3A3A3C] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
                     </div>
                     
                     <div className="pt-4 flex gap-4">
-                        <div className="flex items-center bg-gray-100 rounded-xl p-1">
-                            <button type="button" onClick={() => setAddQuantity(Math.max(1, addQuantity - 1))} className="p-3 hover:bg-white rounded-lg transition-all shadow-sm text-gray-600 cursor-pointer"><Minus size={18} /></button>
-                            <span className="w-10 text-center font-bold text-gray-900">{addQuantity}</span>
-                            <button type="button" onClick={() => setAddQuantity(Math.min(10, addQuantity + 1))} className="p-3 hover:bg-white rounded-lg transition-all shadow-sm text-gray-600 cursor-pointer"><Plus size={18} /></button>
+                        <div className="flex items-center bg-gray-100 dark:bg-[#2C2C2E] rounded-xl p-1">
+                            <button type="button" onClick={() => setAddQuantity(Math.max(1, addQuantity - 1))} className="p-3 hover:bg-white dark:hover:bg-[#3A3A3C] rounded-lg transition-all shadow-sm text-gray-600 dark:text-gray-400 cursor-pointer"><Minus size={18} /></button>
+                            <span className="w-10 text-center font-bold text-gray-900 dark:text-white">{addQuantity}</span>
+                            <button type="button" onClick={() => setAddQuantity(Math.min(10, addQuantity + 1))} className="p-3 hover:bg-white dark:hover:bg-[#3A3A3C] rounded-lg transition-all shadow-sm text-gray-600 dark:text-gray-400 cursor-pointer"><Plus size={18} /></button>
                         </div>
-                        <button type="submit" className="flex-1 bg-black text-white py-4 rounded-xl font-bold text-sm tracking-wide shadow-lg hover:bg-gray-800 active:scale-[0.98] transition-all cursor-pointer">
+                        <button type="submit" className="flex-1 bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold text-sm tracking-wide shadow-lg hover:bg-gray-800 dark:hover:bg-gray-200 active:scale-[0.98] transition-all cursor-pointer">
                             AJOUTER AU STOCK
                         </button>
                     </div>
@@ -545,11 +458,11 @@ export default function Home() {
 
       {/* --- MODALE EDIT --- */}
       {isEditModalOpen && editingBobine && (
-        <div className="fixed inset-0 bg-gray-900/20 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade">
-            <div className="bg-white w-full max-w-lg p-8 rounded-[2rem] shadow-2xl relative animate-modal border border-gray-100">
+        <div className="fixed inset-0 bg-gray-900/20 dark:bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade">
+            <div className="bg-white dark:bg-[#1C1C1E] w-full max-w-lg p-8 rounded-[2rem] shadow-2xl relative animate-modal border border-gray-100 dark:border-gray-800">
                 <div className="flex justify-between items-center mb-8">
-                    <h3 className="font-bold text-2xl text-gray-900 tracking-tight">Modifier #{editingBobine.spool_number}</h3>
-                    <button onClick={() => setIsEditModalOpen(false)} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors cursor-pointer"><X size={20} className="text-gray-600" /></button>
+                    <h3 className="font-bold text-2xl text-gray-900 dark:text-white tracking-tight">Modifier #{editingBobine.spool_number}</h3>
+                    <button onClick={() => setIsEditModalOpen(false)} className="bg-gray-100 dark:bg-[#2C2C2E] hover:bg-gray-200 dark:hover:bg-[#3A3A3C] p-2 rounded-full transition-colors cursor-pointer"><X size={20} className="text-gray-600 dark:text-gray-400" /></button>
                 </div>
                 <form action={async (formData) => { await updateSpool(formData); setIsEditModalOpen(false); fetchData(); }} className="space-y-5">
                     <input type="hidden" name="id" value={editingBobine.id} />
@@ -557,28 +470,22 @@ export default function Home() {
                     <div className="grid grid-cols-2 gap-4">
                         <CustomInput label="Matière" name="material" value={materialInput} setValue={setMaterialInput} list={SUGGESTED_MATERIALS} />
                         <div>
-                           <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Poids (g)</label>
-                           <input type="number" name="initial_weight" defaultValue={editingBobine.weight_initial} className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" required />
+                           <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide ml-1">Poids (g)</label>
+                           <input type="number" name="initial_weight" defaultValue={editingBobine.weight_initial} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-4 rounded-xl outline-none focus:bg-white dark:focus:bg-[#3A3A3C] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" required />
                         </div>
                     </div>
                     <CustomInput label="Couleur" name="color" value={colorInput} setValue={setColorInput} list={brandInput.toLowerCase().includes('bambu') ? BAMBU_COLORS : []} onSelect={(item: any) => { if(item.hex) setColorHex(item.hex); }} />
-                    <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-xl border border-gray-100">
-                       <label className="text-xs font-medium text-gray-500">Aperçu :</label>
+                    <div className="flex items-center gap-4 bg-gray-50 dark:bg-[#2C2C2E] p-3 rounded-xl border border-gray-100 dark:border-gray-700">
+                       <label className="text-xs font-medium text-gray-500 dark:text-gray-400">Aperçu :</label>
                        <div className="h-6 w-6 rounded-full border border-gray-200 shadow-sm" style={{ backgroundColor: colorHex }}></div>
                        <input type="color" name="color_hex" value={colorHex} onChange={(e) => setColorHex(e.target.value)} className="opacity-0 w-0 h-0" id="colorPickerEdit" />
-                       <label htmlFor="colorPickerEdit" className="text-xs text-blue-600 font-medium cursor-pointer hover:underline">Modifier</label>
+                       <label htmlFor="colorPickerEdit" className="text-xs text-blue-600 dark:text-blue-400 font-medium cursor-pointer hover:underline">Modifier</label>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Prix (€)</label>
-                            <input type="number" step="0.01" name="price" defaultValue={editingBobine.price} className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
-                        </div>
-                        <div>
-                            <label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase tracking-wide ml-1">Date d'ouverture</label>
-                            <input type="date" name="date_opened" value={dateInput} onChange={(e) => setDateInput(e.target.value)} className="w-full bg-gray-50 border border-gray-200 text-gray-900 p-4 rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
-                        </div>
+                    <div>
+                        <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide ml-1">Prix (€)</label>
+                        <input type="number" step="0.01" name="price" defaultValue={editingBobine.price} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-4 rounded-xl outline-none focus:bg-white dark:focus:bg-[#3A3A3C] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 font-medium transition-all cursor-pointer" />
                     </div>
-                    <button type="submit" className="w-full bg-black text-white py-4 rounded-xl font-bold text-sm tracking-wide shadow-lg hover:bg-gray-800 active:scale-[0.98] transition-all cursor-pointer">ENREGISTRER</button>
+                    <button type="submit" className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold text-sm tracking-wide shadow-lg hover:bg-gray-800 dark:hover:bg-gray-200 active:scale-[0.98] transition-all cursor-pointer">ENREGISTRER</button>
                 </form>
             </div>
         </div>

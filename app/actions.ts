@@ -22,6 +22,8 @@ async function createClient() {
   )
 }
 
+// ... Tes autres fonctions (addSpool, etc.) restent inchangées ...
+
 export async function addSpool(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -72,34 +74,6 @@ export async function deleteSpool(formData: FormData) {
   revalidatePath('/')
 }
 
-export async function consumeSpool(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return
-
-  const id = formData.get('id') as string
-  const amount = parseInt(formData.get('amount') as string)
-  const projectName = formData.get('project_name') as string || "Impression sans nom"
-
-  // 1. Récupérer la bobine
-  const { data: spool } = await supabase.from('spools').select('*').eq('id', id).single()
-  
-  if (spool) {
-    // 2. Mettre à jour le poids
-    await supabase.from('spools').update({ weight_used: spool.weight_used + amount }).eq('id', id)
-
-    // 3. Ajouter l'entrée dans l'historique
-    await supabase.from('consumption_logs').insert({
-      user_id: user.id,
-      spool_id: id,
-      spool_name: `${spool.brand} ${spool.material} ${spool.color_name} (#${spool.spool_number})`,
-      amount: amount,
-      project_name: projectName
-    })
-  }
-  revalidatePath('/')
-}
-
 export async function updateThreshold(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -113,6 +87,67 @@ export async function updateThreshold(formData: FormData) {
     low_stock_threshold: lowStock,
     similar_stock_threshold: similarStock
   })
+
+  revalidatePath('/')
+}
+
+// --- LA FONCTION CORRIGÉE ---
+export async function consumeSpool(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  
+  if (!user) {
+      console.error("Utilisateur non connecté")
+      return
+  }
+
+  const id = formData.get('id') as string
+  const amountStr = formData.get('amount') as string
+  const amount = parseInt(amountStr) || 0 // Sécurité si vide
+  const projectName = formData.get('project_name') as string || "Impression"
+
+  console.log(`Tentative de consommation : ${amount}g sur la bobine ${id}`)
+
+  try {
+      // 1. Récupérer la bobine pour avoir son poids actuel
+      const { data: spool, error: fetchError } = await supabase.from('spools').select('*').eq('id', id).single()
+      
+      if (fetchError || !spool) {
+          console.error("Erreur récupération bobine:", fetchError)
+          return
+      }
+
+      // Sécurité : Si le poids utilisé est null, on le considère comme 0
+      const currentUsed = spool.weight_used || 0
+      const newUsed = currentUsed + amount
+
+      // 2. Mettre à jour le poids
+      const { error: updateError } = await supabase
+          .from('spools')
+          .update({ weight_used: newUsed })
+          .eq('id', id)
+
+      if (updateError) {
+          console.error("Erreur mise à jour poids:", updateError)
+          return
+      }
+
+      // 3. Tenter d'ajouter l'historique (sans faire planter si ça échoue)
+      const { error: logError } = await supabase.from('consumption_logs').insert({
+          user_id: user.id,
+          spool_id: id,
+          spool_name: `${spool.brand} ${spool.material} ${spool.color_name} (#${spool.spool_number})`,
+          amount: amount,
+          project_name: projectName
+      })
+
+      if (logError) {
+          console.error("Attention: Historique non enregistré (table manquante ?)", logError)
+      }
+
+  } catch (error) {
+      console.error("Erreur inattendue:", error)
+  }
 
   revalidatePath('/')
 }
