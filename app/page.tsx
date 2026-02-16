@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { createClient } from '../utils/supabase/client'
 import { addSpool, deleteSpool, consumeSpool } from './actions'
-import { Search, Plus, Trash2, Printer, LogOut, X } from 'lucide-react'
+import { Search, Plus, Trash2, Disc3, LogOut, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 // --- LISTES DE SUGGESTIONS ---
@@ -55,19 +55,29 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-[#1A1A2E] text-[#EAEAEA] font-sans pb-20">
       
-      {/* HEADER */}
       <header className="border-b border-gray-800 bg-[#16213E]/80 backdrop-blur-md p-4 sticky top-0 z-10 shadow-lg">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-gradient-to-br from-[#2D7DD2] to-blue-600 p-2.5 rounded-xl shadow-lg shadow-blue-500/20">
-              <Printer size={26} className="text-white" />
+            {/* Le nouveau logo Bobine avec un léger dégradé */}
+            <div className="bg-gradient-to-br from-[#2D7DD2] to-blue-600 p-2 rounded-xl shadow-lg shadow-blue-500/20">
+              <Disc3 size={28} className="text-white" />
             </div>
-            <h1 className="text-xl font-bold tracking-tight">ATELIER 3D</h1>
+            {/* Titre aligné sur la nouvelle DA */}
+            <h1 className="text-lg font-black tracking-tighter uppercase text-white">
+              Stock Filaments
+            </h1>
           </div>
           
           <div className="flex items-center gap-4">
-            <span className="text-sm font-medium text-gray-400 hidden md:block">{user.email}</span>
-            <button onClick={handleSignOut} className="p-2.5 hover:bg-red-500/10 text-red-400 rounded-xl transition border border-transparent hover:border-red-500/30">
+            {/* Affichage du pseudo s'il existe, sinon l'email */}
+            <span className="text-xs font-bold text-gray-500 uppercase tracking-widest hidden md:block">
+              Connecté : {user.user_metadata?.username || user.email.split('@')[0]}
+            </span>
+            <button 
+              onClick={handleSignOut} 
+              className="p-2.5 hover:bg-red-500/10 text-red-400 rounded-xl transition border border-transparent hover:border-red-500/30"
+              title="Se déconnecter"
+            >
               <LogOut size={20} />
             </button>
           </div>
