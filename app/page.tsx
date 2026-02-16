@@ -16,18 +16,14 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [filterMaterial, setFilterMaterial] = useState('Tous')
   
-  // États des Modales
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingBobine, setEditingBobine] = useState<any>(null)
-  
-  // État de quantité pour l'ajout
   const [addQuantity, setAddQuantity] = useState(1)
   
   const supabase = createClient()
   const router = useRouter()
 
-  // --- CHARGEMENT DES DONNÉES ---
   const fetchBobines = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return router.push('/login')
@@ -49,7 +45,6 @@ export default function Home() {
     router.push('/login')
   }
 
-  // --- FILTRAGE ---
   const filteredBobines = bobines.filter(b => {
     const matchSearch = b.brand.toLowerCase().includes(search.toLowerCase()) || 
                         (b.color_name && b.color_name.toLowerCase().includes(search.toLowerCase()))
@@ -87,8 +82,8 @@ export default function Home() {
 
       <main className="max-w-7xl mx-auto p-6 md:p-8 space-y-8">
         
-        {/* --- STATS --- */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* --- STATS ET BOUTON AJOUTER --- */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-[#16213E] p-5 rounded-2xl border border-gray-800/60 shadow-sm">
             <p className="text-gray-400 text-xs uppercase font-bold mb-1 tracking-wider">Total Bobines</p>
             <p className="text-3xl font-black text-[#2D7DD2]">{bobines.length}</p>
@@ -99,6 +94,17 @@ export default function Home() {
               {bobines.filter(b => (b.weight_initial - (b.weight_used || 0)) < 200).length}
             </p>
           </div>
+          
+          {/* LE BOUTON D'AJOUT EST MAINTENANT ICI */}
+          <button 
+            onClick={() => setIsModalOpen(true)} 
+            className="lg:col-span-2 bg-gradient-to-r from-[#2D7DD2] to-blue-600 p-5 rounded-2xl shadow-lg shadow-blue-500/10 hover:shadow-blue-500/20 transition-all flex items-center justify-center gap-4 group active:scale-[0.98]"
+          >
+            <div className="bg-white/20 p-2 rounded-xl group-hover:scale-110 transition-transform">
+              <Plus size={24} className="text-white" />
+            </div>
+            <span className="text-lg font-black uppercase tracking-widest text-white">Ajouter une nouvelle bobine</span>
+          </button>
         </div>
 
         {/* --- RECHERCHE ET FILTRES --- */}
@@ -124,15 +130,6 @@ export default function Home() {
 
         {/* --- GRILLE DES CARTES --- */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          
-          {/* BOUTON AJOUTER */}
-          <button onClick={() => setIsModalOpen(true)} className="border-3 border-dashed border-gray-800/60 rounded-3xl flex flex-col items-center justify-center p-8 hover:border-[#2D7DD2] hover:bg-[#2D7DD2]/5 transition group min-h-[250px]">
-            <div className="bg-gray-800 group-hover:bg-[#2D7DD2] p-5 rounded-full mb-4 transition shadow-lg">
-              <Plus size={36} className="text-gray-400 group-hover:text-white" />
-            </div>
-            <span className="font-bold text-lg text-gray-500 group-hover:text-[#2D7DD2]">Ajouter au stock</span>
-          </button>
-
           {filteredBobines.map((bobine) => {
             const poidsInitial = bobine.weight_initial || 1000;
             const reste = poidsInitial - (bobine.weight_used || 0);
@@ -144,21 +141,19 @@ export default function Home() {
                 <div className="h-3 w-full" style={{ backgroundColor: bobine.color_hex || '#2D7DD2' }}></div>
                 <div className="p-6 flex-1 flex flex-col">
                   <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1">
+                    <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-xl leading-tight mb-1 truncate">{bobine.brand}</h3>
                       <div className="flex items-center gap-2">
                         <span className="bg-[#1A1A2E] text-[#2D7DD2] text-[10px] font-black uppercase px-2 py-0.5 rounded-md">{bobine.material}</span>
-                        <span className="text-xs text-gray-500 truncate max-w-[80px]">{bobine.color_name}</span>
+                        <span className="text-xs text-gray-500 truncate">{bobine.color_name}</span>
                       </div>
                     </div>
-                    
-                    {/* ACTIONS (EDIT + DELETE) */}
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                    <div className="flex gap-2 ml-2">
                       <button 
                         onClick={() => { setEditingBobine(bobine); setIsEditModalOpen(true); }}
-                        className="text-gray-600 hover:text-[#2D7DD2] transition p-1.5 rounded bg-[#1A1A2E]"
+                        className="text-gray-500 hover:text-[#2D7DD2] transition p-2 rounded-xl bg-[#1A1A2E] border border-gray-800"
                       >
-                        <Edit2 size={15} />
+                        <Edit2 size={16} />
                       </button>
                       <form action={async (formData) => {
                         if (window.confirm(`Supprimer définitivement ${bobine.brand} ?`)) {
@@ -167,8 +162,8 @@ export default function Home() {
                         }
                       }}>
                         <input type="hidden" name="id" value={bobine.id} />
-                        <button className="text-gray-600 hover:text-red-500 transition p-1.5 rounded bg-[#1A1A2E]">
-                          <Trash2 size={15} />
+                        <button className="text-gray-500 hover:text-red-500 transition p-2 rounded-xl bg-[#1A1A2E] border border-gray-800">
+                          <Trash2 size={16} />
                         </button>
                       </form>
                     </div>
@@ -179,12 +174,10 @@ export default function Home() {
                      <span className="text-gray-500 text-xs font-bold">/ {poidsInitial}g</span>
                   </div>
 
-                  {/* JAUGE */}
                   <div className="w-full bg-[#1A1A2E] rounded-full h-3 mb-6 p-0.5 border border-gray-800">
                     <div className={`h-full rounded-full transition-all duration-1000 ${isLow ? 'bg-[#F18F01]' : 'bg-[#44BBA4]'}`} style={{ width: `${pourcent}%` }}></div>
                   </div>
 
-                  {/* CONSOMMATION PRÉCISE */}
                   <form action={async (formData) => {
                     await consumeSpool(formData);
                     fetchBobines();
@@ -194,10 +187,10 @@ export default function Home() {
                     <input type="hidden" name="id" value={bobine.id} />
                     <div className="flex gap-2">
                       <div className="relative flex-1">
-                        <input id={`input-${bobine.id}`} type="number" name="amount" placeholder="Consommé" className="w-full bg-[#1A1A2E] border border-gray-800 rounded-xl py-2 px-3 text-sm outline-none focus:border-[#2D7DD2] font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" required />
+                        <input id={`input-${bobine.id}`} type="number" name="amount" placeholder="Consommé" className="w-full bg-[#1A1A2E] border border-gray-800 rounded-xl py-2.5 px-4 text-sm outline-none focus:border-[#2D7DD2] font-bold [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" required />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-600 text-[10px] font-black uppercase pointer-events-none">g</span>
                       </div>
-                      <button type="submit" className="bg-[#2D7DD2] hover:bg-[#2465aa] text-white px-4 py-2 rounded-xl transition font-black text-xs uppercase shadow-lg active:scale-95">OK</button>
+                      <button type="submit" className="bg-[#2D7DD2] hover:bg-[#2465aa] text-white px-5 py-2.5 rounded-xl transition font-black text-xs uppercase shadow-lg active:scale-95">OK</button>
                     </div>
                   </form>
                 </div>
@@ -207,7 +200,7 @@ export default function Home() {
         </div>
       </main>
 
-      {/* --- MODALE D'AJOUT (AVEC QUANTITÉ) --- */}
+      {/* --- MODALES --- */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-[#16213E] w-full max-w-md p-8 rounded-3xl border border-gray-700 shadow-2xl relative">
@@ -215,21 +208,12 @@ export default function Home() {
                     <h3 className="font-bold text-2xl text-white tracking-tight">Nouvel arrivage</h3>
                     <button onClick={() => { setIsModalOpen(false); setAddQuantity(1); }} className="text-gray-400 hover:text-white bg-[#1A1A2E] p-2 rounded-full"><X size={24} /></button>
                 </div>
-                
-                <form action={async (formData) => { 
-                    await addSpool(formData); 
-                    setIsModalOpen(false); 
-                    setAddQuantity(1);
-                    fetchBobines(); 
-                }} className="space-y-5">
-                    
+                <form action={async (formData) => { await addSpool(formData); setIsModalOpen(false); setAddQuantity(1); fetchBobines(); }} className="space-y-5">
                     <input type="hidden" name="quantity" value={addQuantity} />
-
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest">Marque</label>
                         <input name="brand" list="brand-list" placeholder="ex: Sunlu" className="w-full bg-[#1A1A2E] border border-gray-800 p-4 rounded-2xl outline-none focus:border-[#2D7DD2]" required />
                     </div>
-
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest">Matière</label>
@@ -240,7 +224,6 @@ export default function Home() {
                            <input type="number" name="initial_weight" defaultValue="1000" className="w-full bg-[#1A1A2E] border border-gray-800 p-4 rounded-2xl outline-none" required />
                         </div>
                     </div>
-
                     <div>
                         <label className="block text-xs font-bold text-gray-500 mb-2 uppercase tracking-widest">Couleur</label>
                         <div className="flex gap-3">
@@ -250,8 +233,6 @@ export default function Home() {
                             </div>
                         </div>
                     </div>
-                    
-                    {/* SÉLECTEUR DE QUANTITÉ + BOUTON VALIDATION */}
                     <div className="flex gap-3 pt-4">
                         <div className="flex items-center bg-[#1A1A2E] border border-gray-800 rounded-2xl p-1 shrink-0">
                             <button type="button" onClick={() => setAddQuantity(Math.max(1, addQuantity - 1))} className="p-3 hover:text-[#2D7DD2] transition text-gray-500"><Minus size={20} /></button>
@@ -267,12 +248,11 @@ export default function Home() {
         </div>
       )}
 
-      {/* --- MODALE D'ÉDITION --- */}
       {isEditModalOpen && editingBobine && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
             <div className="bg-[#16213E] w-full max-w-md p-8 rounded-3xl border border-gray-700 shadow-2xl relative">
                 <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-2xl text-white tracking-tight">Modifier la fiche</h3>
+                    <h3 className="font-bold text-2xl text-white">Modifier la fiche</h3>
                     <button onClick={() => setIsEditModalOpen(false)} className="text-gray-400 hover:text-white bg-[#1A1A2E] p-2 rounded-full"><X size={24} /></button>
                 </div>
                 <form action={async (formData) => { await updateSpool(formData); setIsEditModalOpen(false); fetchBobines(); }} className="space-y-5">
@@ -304,7 +284,6 @@ export default function Home() {
         </div>
       )}
 
-      {/* LISTES DE SUGGESTIONS */}
       <datalist id="brand-list">{SUGGESTED_BRANDS.map(brand => <option key={brand} value={brand} />)}</datalist>
       <datalist id="material-list">{SUGGESTED_MATERIALS.map(m => <option key={m} value={m} />)}</datalist>
     </div>
