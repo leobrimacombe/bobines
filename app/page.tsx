@@ -2,8 +2,14 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../utils/supabase/client'
-import { updateThreshold } from './actions'
-import { Search, Plus, Minus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet } from 'lucide-react'
+// J'ai ajouté 'revertConsumption' dans les imports ci-dessous
+import { addSpool, deleteSpool, consumeSpool, updateSpool, updateThreshold, revertConsumption } from './actions'
+import { 
+  Search, Plus, Trash2, Disc3, LogOut, X, Edit2, 
+  Minus, Settings, Package, Euro, AlertTriangle, 
+  Check, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw
+} from 'lucide-react' // J'ai ajouté 'RotateCcw' ici
+import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import FilamentCharts from '../components/FilamentCharts'
 import Header from '../components/Header'
@@ -159,7 +165,41 @@ export default function Home() {
              {filteredHistory.length > 0 && <FilamentCharts logs={filteredHistory} />}
              <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800">
                  <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white">Détail des consommations</h2>
-                 <div className="space-y-3">{filteredHistory.length === 0 ? <p className="text-gray-400 text-center py-10 italic">Aucune donnée.</p> : filteredHistory.map(log => (<div key={log.id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 transition-colors hover:shadow-sm"><div><p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{new Date(log.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p><p className="font-bold text-sm text-gray-900 dark:text-white">{log.spool_name}</p></div><div className="text-right"><span className="block text-lg font-black text-blue-500">-{log.amount}g</span>{log.spools?.price && log.spools?.weight_initial && (<span className="text-[10px] text-gray-400 font-medium">≈ {((log.spools.price / log.spools.weight_initial) * log.amount).toFixed(2)}€</span>)}</div></div>))}</div>
+                 <div className="space-y-3">
+                    {filteredHistory.length === 0 ? <p className="text-gray-400 text-center py-10 italic">Aucune donnée sur cette période.</p> : filteredHistory.map(log => (
+                        <div key={log.id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 transition-colors hover:shadow-sm">
+                            <div className="flex-1">
+                                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{new Date(log.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
+                                <div className="flex items-center gap-3">
+                                    <p className="font-bold text-sm text-gray-900 dark:text-white">{log.spool_name}</p>
+                                    
+                                    <form action={async (f) => { 
+                                        if (window.confirm('Annuler cette consommation ? Le poids sera rajouté au stock.')) {
+                                            await revertConsumption(f); 
+                                            fetchData(); 
+                                        }
+                                    }}>
+                                        <input type="hidden" name="log_id" value={log.id} />
+                                        <button 
+                                            type="submit" 
+                                            className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-[10px] font-bold uppercase tracking-wide cursor-pointer border border-red-100 dark:border-red-900/30"
+                                            title="Annuler et rembourser le poids"
+                                        >
+                                            <RotateCcw size={12} />
+                                            Annuler
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <span className="block text-lg font-black text-blue-500">-{log.amount}g</span>
+                                {log.spools?.price && log.spools?.weight_initial && (
+                                    <span className="text-[10px] text-gray-400 font-medium">≈ {((log.spools.price / log.spools.weight_initial) * log.amount).toFixed(2)}€</span>
+                                )}
+                            </div>
+                        </div>
+                    ))}
+                 </div>
              </div>
           </div>
         ) : (
