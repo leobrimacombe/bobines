@@ -35,9 +35,40 @@ const BrandLogo = ({ brand, className = "w-5 h-5" }: { brand: string, className?
 };
 
 // --- DONNÉES ---
-const SUGGESTED_BRANDS = ["Bambu Lab", "Sunlu", "eSUN", "Prusament", "Creality", "Eryone", "PolyMaker", "Amazon Basics", "Geeetech"];
-const SUGGESTED_MATERIALS = ["PLA", "PLA+", "PETG", "ABS", "TPU", "ASA", "Nylon", "Wood", "Silk", "Carbon"];
-const BAMBU_COLORS = [{ name: 'Blanc ivoire', ref: '11100', hex: '#FFFFF0' }, { name: 'Blanc os', ref: '11103', hex: '#E3DAC9' }, { name: 'Jaune citron', ref: '11400', hex: '#FFF44F' }, { name: 'Mandarine', ref: '11300', hex: '#FF8800' }, { name: 'Rose sakura', ref: '11201', hex: '#FFB7C5' }, { name: 'Violet lilas', ref: '11700', hex: '#C8A2C8' }, { name: 'Prune', ref: '11204', hex: '#8E4585' }, { name: 'Rouge écarlate', ref: '11200', hex: '#FF2400' }, { name: 'Rouge foncé', ref: '11202', hex: '#8B0000' }, { name: 'Vert pomme', ref: '11502', hex: '#8DB600' }, { name: 'Vert herbacé', ref: '11500', hex: '#355E3B' }, { name: 'Vert foncé', ref: '11501', hex: '#013220' }, { name: 'Bleu glacier', ref: '11601', hex: '#AFDBF5' }, { name: 'Bleu ciel', ref: '11603', hex: '#87CEEB' }, { name: 'Bleu marine', ref: '11600', hex: '#000080' }, { name: 'Bleu foncé', ref: '11602', hex: '#00008B' }, { name: 'Brun clair', ref: '11401', hex: '#C4A484' }, { name: 'Marron latte', ref: '11800', hex: '#7B3F00' }, { name: 'Caramel', ref: '11803', hex: '#AF6E4D' }, { name: 'Terre cuite', ref: '11203', hex: '#E2725B' }, { name: 'Marron foncé', ref: '11801', hex: '#654321' }, { name: 'Chocolat noir', ref: '11802', hex: '#332421' }, { name: 'Gris cendré', ref: '11102', hex: '#B2BEB5' }, { name: 'Gris nardo', ref: '11104', hex: '#686A6C' }, { name: 'Anthracite', ref: '11101', hex: '#36454F' }, { name: 'Noir Basic', ref: '10101', hex: '#000000' }, { name: 'Argent', ref: '10102', hex: '#C0C0C0' }, { name: 'Or', ref: '10103', hex: '#FFD700' }];
+const SUGGESTED_BRANDS = ["Bambu Lab", "Sunlu", "eSUN", "Prusament", "Creality", "Eryone", "PolyMaker", "Amazon Basics", "Geeetech", "Anycubic", "Overture"];
+
+// LISTE MISE À JOUR AVEC TON FICHIER EXCEL
+const SUGGESTED_MATERIALS = [
+    // PLA et ses variantes (Source: ton fichier Excel)
+    "PLA", "PLA Basic", "PLA Matte", "PLA Tough+", "PLA Silk+", 
+    "PLA Translucent", "PLA Silk Multi-Color", "PLA Wood", 
+    "PLA Basic Gradient", "PLA Galaxy", "PLA Metal", "PLA Marble", 
+    "PLA Glow", "PLA Sparkle", "PLA-CF", "PLA Aero",
+    
+    // PETG et ses variantes (Source: ton fichier Excel)
+    "PETG", "PETG-HF", "PETG Translucent", "PETG-CF",
+    
+    // Autres standards
+    "ABS", "TPU", "ASA", "Nylon", "PC", "PVA", "HIPS", "Carbon"
+];
+
+// Couleurs officielles Bambu (Optionnel, juste pour aider la saisie couleur)
+const BAMBU_COLORS = [
+    { name: 'Blanc ivoire', hex: '#FFFFF0' }, { name: 'Blanc os', hex: '#E3DAC9' }, 
+    { name: 'Jaune citron', hex: '#FFF44F' }, { name: 'Mandarine', hex: '#FF8800' }, 
+    { name: 'Rose sakura', hex: '#FFB7C5' }, { name: 'Violet lilas', hex: '#C8A2C8' }, 
+    { name: 'Prune', hex: '#8E4585' }, { name: 'Rouge écarlate', hex: '#FF2400' }, 
+    { name: 'Rouge foncé', hex: '#8B0000' }, { name: 'Vert pomme', hex: '#8DB600' }, 
+    { name: 'Vert herbacé', hex: '#355E3B' }, { name: 'Vert foncé', hex: '#013220' }, 
+    { name: 'Bleu glacier', hex: '#AFDBF5' }, { name: 'Bleu ciel', hex: '#87CEEB' }, 
+    { name: 'Bleu marine', hex: '#000080' }, { name: 'Bleu foncé', hex: '#00008B' }, 
+    { name: 'Brun clair', hex: '#C4A484' }, { name: 'Marron latte', hex: '#7B3F00' }, 
+    { name: 'Caramel', hex: '#AF6E4D' }, { name: 'Terre cuite', hex: '#E2725B' }, 
+    { name: 'Marron foncé', hex: '#654321' }, { name: 'Chocolat noir', hex: '#332421' }, 
+    { name: 'Gris cendré', hex: '#B2BEB5' }, { name: 'Gris nardo', hex: '#686A6C' }, 
+    { name: 'Anthracite', hex: '#36454F' }, { name: 'Noir Basic', hex: '#000000' }, 
+    { name: 'Argent', hex: '#C0C0C0' }, { name: 'Or', hex: '#FFD700' }
+];
 
 const CustomInput = ({ label, name, value, setValue, list, placeholder, onSelect, type = "text", step }: any) => {
   const [showList, setShowList] = useState(false);
@@ -45,10 +76,22 @@ const CustomInput = ({ label, name, value, setValue, list, placeholder, onSelect
     <div className="group">
       <label className="block text-[11px] font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase ml-1 transition-colors group-focus-within:text-blue-500">{label}</label>
       <div className="relative">
-        <input type={type} step={step} name={name} value={value} onChange={(e) => { setValue(e.target.value); if(list) setShowList(true); }} onFocus={() => { if(list) setShowList(true); }} onBlur={() => setTimeout(() => setShowList(false), 200)} placeholder={placeholder} autoComplete="off" className="w-full bg-gray-50/50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-4 rounded-xl outline-none focus:bg-white dark:focus:bg-[#3A3A3C] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium cursor-pointer placeholder:text-gray-400" required />
+        <input 
+            type={type} step={step} name={name} value={value} 
+            onChange={(e) => { setValue(e.target.value); if(list) setShowList(true); }} 
+            onFocus={() => { if(list) setShowList(true); }} 
+            onBlur={() => setTimeout(() => setShowList(false), 200)} 
+            placeholder={placeholder} autoComplete="off" 
+            className="w-full bg-gray-50/50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-900 dark:text-white p-4 rounded-xl outline-none focus:bg-white dark:focus:bg-[#3A3A3C] focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium cursor-pointer placeholder:text-gray-400" 
+            required 
+        />
         {showList && list && list.length > 0 && (
           <ul className="absolute z-50 w-full mt-2 bg-white/90 dark:bg-[#2C2C2E]/90 backdrop-blur-xl border border-gray-200 dark:border-gray-700 rounded-xl max-h-48 overflow-y-auto shadow-2xl animate-fade">
-            {list.filter((item: any) => typeof item === 'string' ? item.toLowerCase().includes(value.toLowerCase()) : (item.name.toLowerCase().includes(value.toLowerCase()) || item.ref.includes(value))).map((item: any, index: number) => {
+            {list.filter((item: any) => 
+                typeof item === 'string' 
+                ? item.toLowerCase().includes(value.toLowerCase()) 
+                : (item.name.toLowerCase().includes(value.toLowerCase()) || (item.ref && item.ref.includes(value)))
+            ).map((item: any, index: number) => {
                const display = typeof item === 'string' ? item : item.name;
                return (
                   <li key={index} onClick={() => { setValue(display); setShowList(false); if (onSelect) onSelect(item); }} className="p-3 hover:bg-blue-50 dark:hover:bg-blue-900/30 cursor-pointer text-sm border-b border-gray-100 dark:border-gray-700 last:border-0 flex items-center justify-between text-gray-800 dark:text-gray-200 transition-colors">
@@ -162,6 +205,13 @@ export default function Home() {
       setIsEditModalOpen(true);
   }
 
+  // --- LOGIQUE D'AFFICHAGE COULEURS BAMBU (Optionnel) ---
+  const getColorList = () => {
+      // On garde juste les couleurs Bambu si c'est du Bambu, sinon rien (saisie libre)
+      if (brandInput.toLowerCase().includes('bambu')) return BAMBU_COLORS;
+      return [];
+  };
+
   const filteredBobines = bobines.filter(b => {
     const matchSearch = b.brand.toLowerCase().includes(search.toLowerCase()) || 
                         (b.color_name && b.color_name.toLowerCase().includes(search.toLowerCase())) ||
@@ -272,7 +322,6 @@ export default function Home() {
                       const isOld = (d:string) => d && new Date(d) < new Date(new Date().setMonth(new Date().getMonth()-6));
                       return (
                         <div key={bobine.id} className={`bg-white dark:bg-[#1C1C1E] rounded-2xl border transition-all duration-300 flex flex-col group hover:-translate-y-1 hover:shadow-xl ${isLow ? 'border-orange-200 shadow-orange-50' : 'border-gray-100 dark:border-gray-800 shadow-sm'}`}>
-                          {/* CORRECTION DU BORD HAUT (rounded-t-2xl) */}
                           <div className="h-16 w-full relative flex items-end p-4 pb-2 rounded-t-2xl" style={{ backgroundColor: bobine.color_hex || '#F5F5F7' }}>
                               <div className="absolute top-3 left-3 bg-white/90 dark:bg-[#1C1C1E]/90 backdrop-blur-md px-2 py-1 rounded-lg shadow-sm border border-black/5 dark:border-white/10"><span className="text-[10px] font-bold">#{bobine.spool_number}</span></div>
                               <div className="absolute top-3 right-3 flex gap-2">
@@ -361,8 +410,12 @@ export default function Home() {
             <form action={async(f)=>{await addSpool(f);setIsModalOpen(false);fetchData()}} className="space-y-4">
               <input type="hidden" name="quantity" value={addQuantity} />
               <CustomInput label="Marque" name="brand" value={brandInput} setValue={setBrandInput} list={SUGGESTED_BRANDS} />
+              
+              {/* C'EST ICI QUE LA LISTE EXCEL APPARAITRA POUR LE CHAMP MATIÈRE */}
               <div className="grid grid-cols-2 gap-4"><CustomInput label="Matière" name="material" value={materialInput} setValue={setMaterialInput} list={SUGGESTED_MATERIALS}/><div className="relative"><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Poids (g)</label><input type="number" name="initial_weight" value={weightInput} onChange={e=>setWeightInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white" required/></div></div>
-              <CustomInput label="Couleur" name="color" value={colorInput} setValue={setColorInput} list={brandInput.toLowerCase().includes('bambu')?BAMBU_COLORS:[]} onSelect={(i:any)=>{if(i.hex)setColorHex(i.hex)}}/>
+              
+              <CustomInput label="Couleur" name="color" value={colorInput} setValue={setColorInput} list={getColorList()} onSelect={(i:any)=>{if(i.hex)setColorHex(i.hex)}}/>
+              
               <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700"><label className="text-xs font-bold text-gray-500">Aperçu :</label><div className="h-6 w-6 rounded-full border shadow-sm" style={{backgroundColor:colorHex}}/><input type="color" name="color_hex" value={colorHex} onChange={e=>setColorHex(e.target.value)} className="opacity-0 w-0 h-0" id="cp"/><label htmlFor="cp" className="text-xs text-blue-500 font-bold cursor-pointer hover:underline transition-all">Modifier</label></div>
               <div className="grid grid-cols-2 gap-4"><div><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Prix (€)</label><input type="number" step="0.01" name="price" value={priceInput} onChange={e=>setPriceInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white"/></div><div><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Ouverture</label><input type="date" name="date_opened" value={dateInput} onChange={e=>setDateInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white"/></div></div>
               <div className="pt-4 flex gap-4"><div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1"><button type="button" onClick={()=>setAddQuantity(Math.max(1,addQuantity-1))} className="p-3 cursor-pointer hover:bg-white dark:hover:bg-black rounded-lg transition-colors"><Minus size={18} className="text-gray-600 dark:text-gray-400"/></button><span className="w-10 text-center font-bold text-gray-900 dark:text-white">{addQuantity}</span><button type="button" onClick={()=>setAddQuantity(Math.min(10,addQuantity+1))} className="p-3 cursor-pointer hover:bg-white dark:hover:bg-black rounded-lg transition-colors"><Plus size={18} className="text-gray-600 dark:text-gray-400"/></button></div><button type="submit" className="flex-1 bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all hover:opacity-90">Ajouter</button></div>
@@ -378,8 +431,12 @@ export default function Home() {
             <form action={async(f)=>{await updateSpool(f);setIsEditModalOpen(false);fetchData()}} className="space-y-4">
               <input type="hidden" name="id" value={editingBobine.id}/>
               <CustomInput label="Marque" name="brand" value={brandInput} setValue={setBrandInput} list={SUGGESTED_BRANDS} />
+              
+              {/* C'EST ICI AUSSI POUR LA MODIF */}
               <div className="grid grid-cols-2 gap-4"><CustomInput label="Matière" name="material" value={materialInput} setValue={setMaterialInput} list={SUGGESTED_MATERIALS}/><div className="relative"><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Poids initial (g)</label><input type="number" name="initial_weight" value={weightInput} onChange={e=>setWeightInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white" required/></div></div>
-              <CustomInput label="Couleur" name="color" value={colorInput} setValue={setColorInput} list={brandInput.toLowerCase().includes('bambu')?BAMBU_COLORS:[]} onSelect={(i:any)=>{if(i.hex)setColorHex(i.hex)}}/>
+              
+              <CustomInput label="Couleur" name="color" value={colorInput} setValue={setColorInput} list={getColorList()} onSelect={(i:any)=>{if(i.hex)setColorHex(i.hex)}}/>
+              
               <div className="flex items-center gap-4 bg-gray-50 dark:bg-gray-800 p-3 rounded-xl border border-gray-100 dark:border-gray-700"><div className="h-6 w-6 rounded-full border shadow-sm" style={{backgroundColor:colorHex}}/><input type="color" name="color_hex" value={colorHex} onChange={(e) => setColorHex(e.target.value)} className="opacity-0 w-0 h-0" id="cpe"/><label htmlFor="cpe" className="text-xs text-blue-500 font-bold cursor-pointer hover:underline transition-all">Modifier</label></div>
               <div className="grid grid-cols-2 gap-4"><div><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Prix (€)</label><input type="number" step="0.01" name="price" value={priceInput} onChange={e=>setPriceInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white"/></div><div><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Ouverture</label><input type="date" name="date_opened" value={dateInput} onChange={(e) => setDateInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white"/></div></div>
               <button type="submit" className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:opacity-90">Enregistrer</button>
