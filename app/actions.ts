@@ -53,7 +53,11 @@ export async function deleteSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
   
-  await supabase.from('spools').delete().eq('id', id)
+  await supabase
+    .from('spools')
+    .update({ archived: true })
+    .eq('id', id)
+
   revalidatePath('/')
 }
 

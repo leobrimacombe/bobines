@@ -2,20 +2,15 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../utils/supabase/client'
-// J'ai ajouté 'revertConsumption' dans les imports ci-dessous
-import { addSpool, deleteSpool, consumeSpool, updateSpool, updateThreshold, revertConsumption } from './actions'
-import { 
-  Search, Plus, Trash2, Disc3, LogOut, X, Edit2, 
-  Minus, Settings, Package, Euro, AlertTriangle, 
-  Check, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw
-} from 'lucide-react' // J'ai ajouté 'RotateCcw' ici
-import Image from 'next/image'
+import { updateThreshold, revertConsumption } from './actions'
+import { Search, Plus, Minus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import FilamentCharts from '../components/FilamentCharts'
 import Header from '../components/Header'
 import SpoolCard from '../components/SpoolCard'
 import SpoolModal from '../components/SpoolModal'
 import { BrandLogo } from '../components/ui/BrandLogo'
+import ConfirmModal from '../components/ui/ConfirmModal' // <--- IMPORT
 
 export default function Home() {
   const [bobines, setBobines] = useState<any[]>([])
@@ -34,6 +29,9 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingBobine, setEditingBobine] = useState<any>(null)
 
+  // --- ETAT POUR LA MODALE DE CONFIRMATION GLOBALE ---
+  const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', action: () => {}, isDanger: false })
+
   const supabase = createClient()
   const router = useRouter()
 
@@ -43,7 +41,8 @@ export default function Home() {
         if (!user) { router.push('/login'); return; }
         setUser(user)
 
-        const { data: spools } = await supabase.from('spools').select('*').order('spool_number', { ascending: true })
+        // Afficher seulement les non-archivés
+        const { data: spools } = await supabase.from('spools').select('*').eq('archived', false).order('spool_number', { ascending: true })
         setBobines(spools || [])
 
         const { data: logs } = await supabase.from('consumption_logs').select(`*, spools (price, weight_initial)`).order('created_at', { ascending: false }).limit(500)
@@ -109,6 +108,21 @@ export default function Home() {
     });
   })();
 
+  // GESTION SAUVEGARDE REGLAGES
+  const handleSettingsSubmit = (formData: FormData) => {
+    setConfirmModal({
+        isOpen: true,
+        title: 'Sauvegarder les réglages ?',
+        message: 'Ces seuils seront appliqués à l\'ensemble de votre stock immédiatement.',
+        isDanger: false,
+        action: async () => {
+            await updateThreshold(formData);
+            fetchData();
+            setConfirmModal(prev => ({ ...prev, isOpen: false }));
+        }
+    });
+  };
+
   if (isLoading) return (<div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex items-center justify-center"><Loader2 className="w-10 h-10 text-blue-500 animate-spin" /></div>);
   if (!user) return <div className="bg-[#F5F5F7] dark:bg-black min-h-screen"></div>
 
@@ -170,21 +184,17 @@ export default function Home() {
                         <div key={log.id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 transition-colors hover:shadow-sm">
                             <div className="flex-1">
                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{new Date(log.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-2">
                                     <p className="font-bold text-sm text-gray-900 dark:text-white">{log.spool_name}</p>
-                                    
                                     <form action={async (f) => { 
+                                        // On utilise confirm() ici car c'est une petite action, ou tu peux aussi mettre un ConfirmModal si tu veux
                                         if (window.confirm('Annuler cette consommation ? Le poids sera rajouté au stock.')) {
                                             await revertConsumption(f); 
                                             fetchData(); 
                                         }
                                     }}>
                                         <input type="hidden" name="log_id" value={log.id} />
-                                        <button 
-                                            type="submit" 
-                                            className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-[10px] font-bold uppercase tracking-wide cursor-pointer border border-red-100 dark:border-red-900/30"
-                                            title="Annuler et rembourser le poids"
-                                        >
+                                        <button type="submit" className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-[10px] font-bold uppercase tracking-wide cursor-pointer border border-red-100 dark:border-red-900/30" title="Annuler (Rembourser)">
                                             <RotateCcw size={12} />
                                             Annuler
                                         </button>
@@ -205,7 +215,8 @@ export default function Home() {
         ) : (
           <div className="max-w-xl mx-auto bg-white dark:bg-[#1C1C1E] p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-fade">
             <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">Réglages</h2>
-            <form action={async (f) => { await updateThreshold(f); fetchData(); alert('Sauvegardé !'); }} className="space-y-8">
+            {/* FORMULAIRE REGLAGES AVEC MODALE */}
+            <form action={handleSettingsSubmit} className="space-y-8">
               <div className="space-y-6">
                 <div><label className="flex justify-between text-sm font-medium mb-4 text-gray-700 dark:text-gray-300"><span>Poids Faible</span><span className="font-bold text-blue-500">{lowStockThreshold}g</span></label><input type="range" name="threshold" min="50" max="500" step="10" value={lowStockThreshold} onChange={e=>setLowStockThreshold(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white" /></div>
                 <div className="pt-6 border-t dark:border-gray-800"><label className="block text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">Seuil Doublons</label><div className="flex items-center gap-4"><button type="button" onClick={()=>setSimilarStockThreshold(Math.max(1,similarStockThreshold-1))} className="w-8 h-8 flex items-center justify-center bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-gray-700 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 hover:scale-110 transition-transform"><Minus size={14}/></button><span className="text-xl font-bold w-4 text-center text-gray-900 dark:text-white">{similarStockThreshold}</span><button type="button" onClick={()=>setSimilarStockThreshold(similarStockThreshold+1)} className="w-8 h-8 flex items-center justify-center bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-gray-700 rounded-full shadow-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 hover:scale-110 transition-transform"><Plus size={14}/></button><input type="hidden" name="similar_threshold" value={similarStockThreshold}/></div></div>
@@ -217,6 +228,16 @@ export default function Home() {
       </main>
 
       <SpoolModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} refreshData={fetchData} initialData={editingBobine} />
+      
+      {/* MODALE GLOBALE (Pour les réglages) */}
+      <ConfirmModal 
+        isOpen={confirmModal.isOpen}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        onConfirm={confirmModal.action}
+        onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))}
+        isDanger={confirmModal.isDanger}
+      />
     </div>
   )
 }
