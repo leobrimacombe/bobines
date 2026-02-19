@@ -10,7 +10,7 @@ import Header from '../components/Header'
 import SpoolCard from '../components/SpoolCard'
 import SpoolModal from '../components/SpoolModal'
 import { BrandLogo } from '../components/ui/BrandLogo'
-import ConfirmModal from '../components/ui/ConfirmModal' // <--- IMPORT
+import ConfirmModal from '../components/ui/ConfirmModal'
 
 export default function Home() {
   const [bobines, setBobines] = useState<any[]>([])
@@ -29,7 +29,6 @@ export default function Home() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingBobine, setEditingBobine] = useState<any>(null)
 
-  // --- ETAT POUR LA MODALE DE CONFIRMATION GLOBALE ---
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', action: () => {}, isDanger: false })
 
   const supabase = createClient()
@@ -41,7 +40,7 @@ export default function Home() {
         if (!user) { router.push('/login'); return; }
         setUser(user)
 
-        // Afficher seulement les non-archivés
+        // Correction : On filtre les bobines archivées pour l'affichage, mais elles restent en base
         const { data: spools } = await supabase.from('spools').select('*').eq('archived', false).order('spool_number', { ascending: true })
         setBobines(spools || [])
 
@@ -100,15 +99,21 @@ export default function Home() {
       return history.filter(log => new Date(log.created_at) >= cutoff);
   }, [history, historyRange]);
 
+  // CORRECTION BUG COULEUR ICI (Utilisation de '|' comme séparateur)
   const similarAlerts = (() => {
     const groups: {[key: string]: number} = {};
-    bobines.forEach(b => { groups[`${b.brand}-${b.material}-${b.color_name}`] = (groups[`${b.brand}-${b.material}-${b.color_name}`] || 0) + 1; });
-    return Object.entries(groups).filter(([_, count]) => count < similarStockThreshold).map(([key, count]) => {
-      const [brand, material, color] = key.split('-'); return { brand, material, color, count };
+    bobines.forEach(b => { 
+        const key = `${b.brand}|${b.material}|${b.color_name}`; // Utilisation de | pour éviter les bugs avec PLA-CF
+        groups[key] = (groups[key] || 0) + 1; 
     });
+    return Object.entries(groups)
+        .filter(([_, count]) => count < similarStockThreshold)
+        .map(([key, count]) => {
+            const [brand, material, color] = key.split('|'); 
+            return { brand, material, color, count };
+        });
   })();
 
-  // GESTION SAUVEGARDE REGLAGES
   const handleSettingsSubmit = (formData: FormData) => {
     setConfirmModal({
         isOpen: true,
@@ -143,9 +148,25 @@ export default function Home() {
               <div className="bg-white dark:bg-[#1C1C1E] p-6 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-md transition-shadow">
                   <div className="flex justify-between items-start"><div><p className="text-gray-400 dark:text-gray-500 text-[10px] font-bold uppercase tracking-widest mb-1">Alertes Poids</p><div className="flex items-baseline gap-2"><p className="text-3xl font-semibold text-orange-500 tracking-tight">{bobines.filter(b => (b.weight_initial - (b.weight_used || 0)) < lowStockThreshold).length}</p><span className="text-xs text-orange-500 font-medium bg-orange-50 dark:bg-orange-900/20 px-2 py-0.5 rounded-full">{'<'} {lowStockThreshold}g</span></div></div><div className="p-2 bg-orange-50 dark:bg-orange-900/20 rounded-xl text-orange-500"><AlertTriangle size={20} /></div></div>
               </div>
+              
+              {/* ALERTE REAPPRO AVEC COULEUR CORRIGÉE */}
               {similarAlerts.length > 0 ? (
-                <div className="bg-orange-50/50 dark:bg-orange-900/10 p-6 rounded-2xl border border-orange-100/50 dark:border-orange-900/30 flex flex-col justify-center"><div className="flex items-center gap-2 mb-3"><AlertTriangle size={16} className="text-orange-500" /><p className="text-orange-600 dark:text-orange-400 text-xs font-bold uppercase tracking-wide">Réappro. Conseillé</p></div><div className="flex flex-wrap gap-2">{similarAlerts.map((a, i) => (<span key={i} className="bg-white dark:bg-[#2C2C2E] text-orange-600 dark:text-orange-300 border border-orange-100 dark:border-orange-900/30 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm">{a.count}x {a.brand} {a.material}</span>))}</div></div>
-              ) : (<div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-400 text-sm font-medium">Stock Sain</div>)}
+                <div className="bg-orange-50/50 dark:bg-orange-900/10 p-6 rounded-2xl border border-orange-100/50 dark:border-orange-900/30 flex flex-col justify-center">
+                    <div className="flex items-center gap-2 mb-3">
+                        <AlertTriangle size={16} className="text-orange-500" />
+                        <p className="text-orange-600 dark:text-orange-400 text-xs font-bold uppercase tracking-wide">Réappro. Conseillé</p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {similarAlerts.map((a, i) => (
+                            <span key={i} className="bg-white dark:bg-[#2C2C2E] text-orange-600 dark:text-orange-300 border border-orange-100 dark:border-orange-900/30 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm">
+                                {a.count}x {a.brand} {a.material} <span className="text-orange-800 dark:text-orange-100 opacity-80 font-bold ml-1">{a.color}</span>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+              ) : (
+                <div className="bg-gray-50 dark:bg-gray-800/50 p-6 rounded-2xl border border-dashed border-gray-200 dark:border-gray-700 flex items-center justify-center text-gray-400 text-sm font-medium">Stock Sain</div>
+              )}
             </div>
 
             <div className="flex flex-col md:flex-row gap-4 items-center">
@@ -186,8 +207,8 @@ export default function Home() {
                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{new Date(log.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                                 <div className="flex items-center gap-2">
                                     <p className="font-bold text-sm text-gray-900 dark:text-white">{log.spool_name}</p>
+                                    {/* Bouton d'annulation intégré */}
                                     <form action={async (f) => { 
-                                        // On utilise confirm() ici car c'est une petite action, ou tu peux aussi mettre un ConfirmModal si tu veux
                                         if (window.confirm('Annuler cette consommation ? Le poids sera rajouté au stock.')) {
                                             await revertConsumption(f); 
                                             fetchData(); 
@@ -215,7 +236,6 @@ export default function Home() {
         ) : (
           <div className="max-w-xl mx-auto bg-white dark:bg-[#1C1C1E] p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-fade">
             <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">Réglages</h2>
-            {/* FORMULAIRE REGLAGES AVEC MODALE */}
             <form action={handleSettingsSubmit} className="space-y-8">
               <div className="space-y-6">
                 <div><label className="flex justify-between text-sm font-medium mb-4 text-gray-700 dark:text-gray-300"><span>Poids Faible</span><span className="font-bold text-blue-500">{lowStockThreshold}g</span></label><input type="range" name="threshold" min="50" max="500" step="10" value={lowStockThreshold} onChange={e=>setLowStockThreshold(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white" /></div>
@@ -229,7 +249,6 @@ export default function Home() {
 
       <SpoolModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} refreshData={fetchData} initialData={editingBobine} />
       
-      {/* MODALE GLOBALE (Pour les réglages) */}
       <ConfirmModal 
         isOpen={confirmModal.isOpen}
         title={confirmModal.title}

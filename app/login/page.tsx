@@ -2,10 +2,48 @@
 
 import { useState } from 'react'
 import { login, signup } from './actions'
-import { User, Lock, Mail, Disc3, ArrowRight, ChevronRight } from 'lucide-react'
+import { useFormStatus } from 'react-dom'
+import { User, Lock, Mail, Disc3, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+
+// --- COMPOSANT BOUTON AVEC CHARGEMENT ---
+// On l'extrait pour pouvoir utiliser useFormStatus()
+function SubmitButton({ 
+  children, 
+  action, 
+  loadingText 
+}: { 
+  children: React.ReactNode, 
+  action: (formData: FormData) => Promise<void>,
+  loadingText: string
+}) {
+  const { pending } = useFormStatus()
+
+  return (
+    <button 
+      formAction={action} 
+      disabled={pending}
+      className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl transition-all transform active:scale-[0.98] shadow-xl hover:opacity-90 flex items-center justify-center gap-2 group cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100"
+    >
+      {pending ? (
+        <>
+          <Loader2 size={20} className="animate-spin" />
+          <span>{loadingText}</span>
+        </>
+      ) : (
+        <>
+          {children}
+          <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
+        </>
+      )}
+    </button>
+  )
+}
 
 export default function LoginPage() {
   const [isLoginMode, setIsLoginMode] = useState(true)
+  const searchParams = useSearchParams()
+  const errorMessage = searchParams.get('message')
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7] dark:bg-black p-6 font-sans transition-colors duration-500">
@@ -50,9 +88,18 @@ export default function LoginPage() {
           </div>
         </div>
 
+        {/* --- AFFICHAGE DES ERREURS --- */}
+        {errorMessage && (
+            <div className="mx-10 mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 rounded-2xl flex items-center gap-3 animate-pulse">
+                <AlertCircle className="text-red-500 shrink-0" size={20} />
+                <p className="text-xs font-bold text-red-500">{errorMessage}</p>
+            </div>
+        )}
+
         {/* --- FORMULAIRE AVEC TRANSITION --- */}
         <div className="p-10 pt-0 overflow-hidden">
           <div className="relative w-full transition-all duration-500 ease-in-out" style={{ height: isLoginMode ? '280px' : '360px' }}>
+            
             {/* Formulaire Connexion */}
             <div className={`absolute top-0 left-0 w-full transition-all duration-500 ease-in-out ${isLoginMode ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-full pointer-events-none'}`}>
               <form className="space-y-5">
@@ -84,13 +131,10 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="pt-4">
-                  <button 
-                    formAction={login} 
-                    className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl transition-all transform active:scale-[0.98] shadow-xl hover:opacity-90 flex items-center justify-center gap-2 group cursor-pointer"
-                  >
+                  {/* BOUTON LOGIN MODIFIÉ */}
+                  <SubmitButton action={login} loadingText="Connexion...">
                     Accéder au stock
-                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
             </div>
@@ -139,13 +183,10 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="pt-4">
-                  <button 
-                    formAction={signup} 
-                    className="w-full bg-black dark:bg-white text-white dark:text-black font-bold py-4 rounded-2xl transition-all transform active:scale-[0.98] shadow-xl hover:opacity-90 flex items-center justify-center gap-2 group cursor-pointer"
-                  >
+                  {/* BOUTON SIGNUP MODIFIÉ */}
+                  <SubmitButton action={signup} loadingText="Création...">
                     Créer mon compte
-                    <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
             </div>

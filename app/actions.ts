@@ -18,7 +18,6 @@ export async function addSpool(formData: FormData) {
   const date_opened = formData.get('date_opened')
   const quantity = parseInt(formData.get('quantity') as string) || 1
 
-  // Récupérer le dernier numéro de bobine pour incrémenter
   const { data: lastSpool } = await supabase
     .from('spools')
     .select('spool_number')
@@ -28,7 +27,6 @@ export async function addSpool(formData: FormData) {
 
   let nextNumber = (lastSpool?.spool_number || 0) + 1
 
-  // Créer un tableau pour l'insertion en masse
   const spoolsToInsert = []
   for (let i = 0; i < quantity; i++) {
     spoolsToInsert.push({
@@ -53,6 +51,7 @@ export async function deleteSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
   
+  // SOFT DELETE : On archive au lieu de supprimer physiquement
   await supabase
     .from('spools')
     .update({ archived: true })
@@ -70,15 +69,12 @@ export async function consumeSpool(formData: FormData) {
   const id = formData.get('id')
   const amount = parseInt(formData.get('amount') as string)
 
-  // 1. Lire la bobine actuelle
   const { data: spool } = await supabase.from('spools').select('*').eq('id', id).single()
   
   if (spool) {
-    // 2. Mettre à jour le poids utilisé
     const newUsed = (spool.weight_used || 0) + amount
     await supabase.from('spools').update({ weight_used: newUsed }).eq('id', id)
 
-    // 3. Ajouter une entrée dans l'historique
     await supabase.from('consumption_logs').insert({
       user_id: user.id,
       spool_id: id,
@@ -116,7 +112,6 @@ export async function updateThreshold(formData: FormData) {
   const threshold = parseInt(formData.get('threshold') as string)
   const similarThreshold = parseInt(formData.get('similar_threshold') as string)
 
-  // Upsert : met à jour si existe, sinon crée
   await supabase.from('user_settings').upsert({ 
     user_id: user.id, 
     low_stock_threshold: threshold,
@@ -126,9 +121,8 @@ export async function updateThreshold(formData: FormData) {
   revalidatePath('/')
 }
 
-// --- LA NOUVELLE FONCTION QUI MANQUAIT ---
 export async function revertConsumption(formData: FormData) {
-  const supabase = await createClient() // Utilise le client serveur correct
+  const supabase = await createClient()
   
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
@@ -144,7 +138,7 @@ export async function revertConsumption(formData: FormData) {
 
   if (!log) return
 
-  // 2. Si la bobine existe encore, on lui "rend" son filament
+  // 2. Si la bobine existe encore (et n'est pas supprimée physiquement), on rembourse
   if (log.spool_id) {
     const { data: spool } = await supabase
       .from('spools')
