@@ -10,38 +10,25 @@ const SUGGESTED_BRANDS = ["Bambu Lab", "Sunlu", "eSUN", "Prusament", "Creality",
 const SUGGESTED_MATERIALS = ["PLA", "PLA Basic", "PLA Matte", "PLA Tough+", "PLA Silk+", "PLA Translucent", "PLA Silk Multi-Color", "PLA Wood", "PLA Basic Gradient", "PLA Galaxy", "PLA Metal", "PLA Marble", "PLA Glow", "PLA Sparkle", "PLA-CF", "PLA Aero", "PETG", "PETG-HF", "PETG Translucent", "PETG-CF", "ABS", "TPU", "ASA", "Nylon", "PC", "PVA", "HIPS", "Carbon"];
 const BAMBU_COLORS = [{ name: 'Blanc ivoire', hex: '#FFFFF0' }, { name: 'Blanc os', hex: '#E3DAC9' }, { name: 'Jaune citron', hex: '#FFF44F' }, { name: 'Mandarine', hex: '#FF8800' }, { name: 'Rose sakura', hex: '#FFB7C5' }, { name: 'Violet lilas', hex: '#C8A2C8' }, { name: 'Prune', hex: '#8E4585' }, { name: 'Rouge écarlate', hex: '#FF2400' }, { name: 'Rouge foncé', hex: '#8B0000' }, { name: 'Vert pomme', hex: '#8DB600' }, { name: 'Vert herbacé', hex: '#355E3B' }, { name: 'Vert foncé', hex: '#013220' }, { name: 'Bleu glacier', hex: '#AFDBF5' }, { name: 'Bleu ciel', hex: '#87CEEB' }, { name: 'Bleu marine', hex: '#000080' }, { name: 'Bleu foncé', hex: '#00008B' }, { name: 'Brun clair', hex: '#C4A484' }, { name: 'Marron latte', hex: '#7B3F00' }, { name: 'Caramel', hex: '#AF6E4D' }, { name: 'Terre cuite', hex: '#E2725B' }, { name: 'Marron foncé', hex: '#654321' }, { name: 'Chocolat noir', hex: '#332421' }, { name: 'Gris cendré', hex: '#B2BEB5' }, { name: 'Gris nardo', hex: '#686A6C' }, { name: 'Anthracite', hex: '#36454F' }, { name: 'Noir Basic', hex: '#000000' }, { name: 'Argent', hex: '#C0C0C0' }, { name: 'Or', hex: '#FFD700' }];
 
-// --- LE BOUTON INTELLIGENT DE SOUMISSION ---
 function ModalSubmitButton({ isEdit }: { isEdit: boolean }) {
   const { pending } = useFormStatus()
-
-  // Bouton pour la Modification
   if (isEdit) {
     return (
-      <button 
-        type="submit" 
-        disabled={pending} 
-        className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
-      >
+      <button type="submit" disabled={pending} className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:opacity-90 disabled:opacity-70 flex items-center justify-center gap-2">
         {pending && <Loader2 size={18} className="animate-spin" />}
         {pending ? 'Enregistrement...' : 'Enregistrer'}
       </button>
     )
   }
-
-  // Bouton pour l'Ajout
   return (
-    <button 
-      type="submit" 
-      disabled={pending} 
-      className="flex-1 bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
-    >
+    <button type="submit" disabled={pending} className="flex-1 bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all hover:opacity-90 disabled:opacity-70 flex items-center justify-center gap-2 cursor-pointer">
       {pending && <Loader2 size={18} className="animate-spin" />}
       {pending ? 'Ajout...' : 'Ajouter'}
     </button>
   )
 }
 
-export default function SpoolModal({ isOpen, onClose, refreshData, initialData = null }: any) {
+export default function SpoolModal({ isOpen, onClose, refreshData, initialData = null, prefillData = null }: any) {
   const [addQuantity, setAddQuantity] = useState(1)
   const [brandInput, setBrandInput] = useState('')
   const [materialInput, setMaterialInput] = useState('')
@@ -53,26 +40,23 @@ export default function SpoolModal({ isOpen, onClose, refreshData, initialData =
 
   useEffect(() => {
     if (initialData) {
-        setBrandInput(initialData.brand);
-        setMaterialInput(initialData.material);
-        setColorInput(initialData.color_name);
-        setColorHex(initialData.color_hex || '#000000');
-        setPriceInput(initialData.price);
-        setWeightInput(initialData.weight_initial);
-        setDateInput(initialData.date_opened || new Date().toISOString().split('T')[0]);
+        setBrandInput(initialData.brand); setMaterialInput(initialData.material); setColorInput(initialData.color_name); setColorHex(initialData.color_hex || '#000000');
+        setPriceInput(initialData.price); setWeightInput(initialData.weight_initial); setDateInput(initialData.date_opened || new Date().toISOString().split('T')[0]);
+    } else if (prefillData) {
+        setBrandInput(prefillData.brand); setMaterialInput(prefillData.material); setColorInput(prefillData.color_name); setColorHex(prefillData.color_hex || '#000000');
+        setPriceInput(''); setWeightInput('1000'); setAddQuantity(1); setDateInput(new Date().toISOString().split('T')[0]);
     } else {
         setBrandInput(''); setMaterialInput(''); setColorInput(''); setColorHex('#000000'); 
-        setPriceInput(''); setWeightInput('1000'); setAddQuantity(1); 
-        setDateInput(new Date().toISOString().split('T')[0]);
+        setPriceInput(''); setWeightInput('1000'); setAddQuantity(1); setDateInput(new Date().toISOString().split('T')[0]);
     }
-  }, [initialData, isOpen]);
+  }, [initialData, prefillData, isOpen]);
 
   if (!isOpen) return null;
 
   const getColorList = () => { if (brandInput.toLowerCase().includes('bambu')) return BAMBU_COLORS; return []; };
 
   return (
-    <div className="fixed inset-0 bg-black/40 dark:bg-black/60 backdrop-blur-md z-50 flex items-center justify-center p-4 animate-fade">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/40 dark:bg-black/60 backdrop-blur-sm animate-fade">
       <div className="bg-white dark:bg-[#1C1C1E] w-full max-w-lg p-8 rounded-3xl shadow-2xl relative max-h-[90vh] overflow-y-auto border dark:border-gray-800 animate-modal">
         <div className="flex justify-between items-center mb-6 sticky top-0 bg-white dark:bg-[#1C1C1E] pb-4 border-b border-gray-100 dark:border-gray-800 z-10">
             <h3 className="font-bold text-2xl tracking-tight text-gray-900 dark:text-white">{initialData ? `Modifier #${initialData.spool_number}` : 'Arrivage'}</h3>

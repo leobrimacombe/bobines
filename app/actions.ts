@@ -51,12 +51,7 @@ export async function deleteSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
   
-  // SOFT DELETE : On archive au lieu de supprimer physiquement
-  await supabase
-    .from('spools')
-    .update({ archived: true })
-    .eq('id', id)
-
+  await supabase.from('spools').update({ archived: true }).eq('id', id)
   revalidatePath('/')
 }
 
@@ -123,40 +118,44 @@ export async function updateThreshold(formData: FormData) {
 
 export async function revertConsumption(formData: FormData) {
   const supabase = await createClient()
-  
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
   const logId = formData.get('log_id')
 
-  // 1. On récupère les infos du log avant de le supprimer
-  const { data: log } = await supabase
-    .from('consumption_logs')
-    .select('*')
-    .eq('id', logId)
-    .single()
-
+  const { data: log } = await supabase.from('consumption_logs').select('*').eq('id', logId).single()
   if (!log) return
 
-  // 2. Si la bobine existe encore (et n'est pas supprimée physiquement), on rembourse
   if (log.spool_id) {
-    const { data: spool } = await supabase
-      .from('spools')
-      .select('weight_used')
-      .eq('id', log.spool_id)
-      .single()
-
+    const { data: spool } = await supabase.from('spools').select('weight_used').eq('id', log.spool_id).single()
     if (spool) {
       const newUsed = Math.max(0, spool.weight_used - log.amount)
-      await supabase
-        .from('spools')
-        .update({ weight_used: newUsed })
-        .eq('id', log.spool_id)
+      await supabase.from('spools').update({ weight_used: newUsed }).eq('id', log.spool_id)
     }
   }
 
-  // 3. On supprime le log de l'historique
   await supabase.from('consumption_logs').delete().eq('id', logId)
-  
+  revalidatePath('/')
+}
+
+// --- NOUVELLE FONCTION POUR LE SEUIL PAR GROUPE ---
+export async function updateGroupThreshold(formData: FormData) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return
+
+  const brand = formData.get('brand') as string
+  const material = formData.get('material') as string
+  const color_name = formData.get('color_name') as string
+  const min_spools = parseInt(formData.get('min_spools') as string)
+
+  await supabase.from('group_settings').upsert({
+    user_id: user.id,
+    brand,
+    material,
+    color_name,
+    min_spools
+  }, { onConflict: 'user_id,brand,material,color_name' })
+
   revalidatePath('/')
 }
