@@ -5,12 +5,30 @@ import { createClient } from '../utils/supabase/client'
 import { updateThreshold, revertConsumption } from './actions'
 import { Search, Plus, Minus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useFormStatus } from 'react-dom' // <-- NOUVEL IMPORT ICI
 import FilamentCharts from '../components/FilamentCharts'
 import Header from '../components/Header'
 import SpoolModal from '../components/SpoolModal'
 import GroupDetailsModal from '../components/GroupDetailsModal'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import { BrandLogo } from '../components/ui/BrandLogo'
+
+// --- NOUVEAU BOUTON D'ANNULATION AVEC CHARGEMENT ---
+function RevertButton() {
+  const { pending } = useFormStatus()
+  
+  return (
+    <button 
+      type="submit" 
+      disabled={pending}
+      className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-[10px] font-bold uppercase tracking-wide cursor-pointer border border-red-100 dark:border-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed" 
+      title="Annuler (Rembourser)"
+    >
+      {pending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+      {pending ? 'Annulation...' : 'Annuler'}
+    </button>
+  )
+}
 
 export default function Home() {
   const [bobines, setBobines] = useState<any[]>([])
@@ -27,6 +45,7 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [filterMaterial, setFilterMaterial] = useState('Tous')
   
+  // MODALES
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingBobine, setEditingBobine] = useState<any>(null)
   const [prefillData, setPrefillData] = useState<any>(null)
@@ -97,7 +116,7 @@ export default function Home() {
                 spools: [],
                 totalWeight: 0,
                 totalRemaining: 0,
-                fullSpoolsCount: 0, // Nouveau compteur !
+                fullSpoolsCount: 0,
                 minSpools: setting ? setting.min_spools : 1
             };
         }
@@ -106,7 +125,6 @@ export default function Home() {
         groups[key].totalWeight += (b.weight_initial || 1000);
         groups[key].totalRemaining += remaining;
         
-        // Si la bobine n'a jamais été utilisée, on la compte comme "Complète"
         if ((b.weight_used || 0) === 0) {
             groups[key].fullSpoolsCount += 1;
         }
@@ -224,7 +242,7 @@ export default function Home() {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                       {brandGroups.map((group: any) => {
-                          const isAlert = group.fullSpoolsCount < group.minSpools; // ALERTE SI MOINS DE BOBINES COMPLETES QUE LE SEUIL
+                          const isAlert = group.fullSpoolsCount < group.minSpools;
                           return (
                             <div key={group.key} onClick={() => setSelectedGroupKey(group.key)} className={`bg-white dark:bg-[#1C1C1E] rounded-2xl p-5 border transition-all duration-300 flex flex-col group/card hover:-translate-y-1 cursor-pointer ${isAlert ? 'border-orange-200 shadow-orange-50 hover:shadow-orange-100' : 'border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl'}`}>
                                 <div className="flex items-center gap-4 mb-6">
@@ -273,8 +291,10 @@ export default function Home() {
                         <div key={log.id} className="flex justify-between items-center p-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 transition-colors hover:shadow-sm">
                             <div className="flex-1">
                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{new Date(log.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 mt-1">
                                     <p className="font-bold text-sm text-gray-900 dark:text-white">{log.spool_name}</p>
+                                    
+                                    {/* UTILISATION DU NOUVEAU BOUTON ICI */}
                                     <form action={async (f) => { 
                                         if (window.confirm('Annuler cette consommation ? Le poids sera rajouté au stock.')) {
                                             await revertConsumption(f); 
@@ -282,11 +302,9 @@ export default function Home() {
                                         }
                                     }}>
                                         <input type="hidden" name="log_id" value={log.id} />
-                                        <button type="submit" className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-[10px] font-bold uppercase tracking-wide cursor-pointer border border-red-100 dark:border-red-900/30" title="Annuler (Rembourser)">
-                                            <RotateCcw size={12} />
-                                            Annuler
-                                        </button>
+                                        <RevertButton />
                                     </form>
+
                                 </div>
                             </div>
                             <div className="text-right">
