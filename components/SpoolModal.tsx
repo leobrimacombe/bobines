@@ -1,11 +1,45 @@
+'use client'
+
 import { useState, useEffect } from 'react'
-import { X, Minus, Plus } from 'lucide-react'
+import { X, Minus, Plus, Loader2 } from 'lucide-react'
 import { CustomInput } from './ui/CustomInput'
 import { addSpool, updateSpool } from '../app/actions'
+import { useFormStatus } from 'react-dom'
 
 const SUGGESTED_BRANDS = ["Bambu Lab", "Sunlu", "eSUN", "Prusament", "Creality", "Eryone", "PolyMaker", "Amazon Basics", "Geeetech", "Anycubic", "Overture"];
 const SUGGESTED_MATERIALS = ["PLA", "PLA Basic", "PLA Matte", "PLA Tough+", "PLA Silk+", "PLA Translucent", "PLA Silk Multi-Color", "PLA Wood", "PLA Basic Gradient", "PLA Galaxy", "PLA Metal", "PLA Marble", "PLA Glow", "PLA Sparkle", "PLA-CF", "PLA Aero", "PETG", "PETG-HF", "PETG Translucent", "PETG-CF", "ABS", "TPU", "ASA", "Nylon", "PC", "PVA", "HIPS", "Carbon"];
 const BAMBU_COLORS = [{ name: 'Blanc ivoire', hex: '#FFFFF0' }, { name: 'Blanc os', hex: '#E3DAC9' }, { name: 'Jaune citron', hex: '#FFF44F' }, { name: 'Mandarine', hex: '#FF8800' }, { name: 'Rose sakura', hex: '#FFB7C5' }, { name: 'Violet lilas', hex: '#C8A2C8' }, { name: 'Prune', hex: '#8E4585' }, { name: 'Rouge écarlate', hex: '#FF2400' }, { name: 'Rouge foncé', hex: '#8B0000' }, { name: 'Vert pomme', hex: '#8DB600' }, { name: 'Vert herbacé', hex: '#355E3B' }, { name: 'Vert foncé', hex: '#013220' }, { name: 'Bleu glacier', hex: '#AFDBF5' }, { name: 'Bleu ciel', hex: '#87CEEB' }, { name: 'Bleu marine', hex: '#000080' }, { name: 'Bleu foncé', hex: '#00008B' }, { name: 'Brun clair', hex: '#C4A484' }, { name: 'Marron latte', hex: '#7B3F00' }, { name: 'Caramel', hex: '#AF6E4D' }, { name: 'Terre cuite', hex: '#E2725B' }, { name: 'Marron foncé', hex: '#654321' }, { name: 'Chocolat noir', hex: '#332421' }, { name: 'Gris cendré', hex: '#B2BEB5' }, { name: 'Gris nardo', hex: '#686A6C' }, { name: 'Anthracite', hex: '#36454F' }, { name: 'Noir Basic', hex: '#000000' }, { name: 'Argent', hex: '#C0C0C0' }, { name: 'Or', hex: '#FFD700' }];
+
+// --- LE BOUTON INTELLIGENT DE SOUMISSION ---
+function ModalSubmitButton({ isEdit }: { isEdit: boolean }) {
+  const { pending } = useFormStatus()
+
+  // Bouton pour la Modification
+  if (isEdit) {
+    return (
+      <button 
+        type="submit" 
+        disabled={pending} 
+        className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
+      >
+        {pending && <Loader2 size={18} className="animate-spin" />}
+        {pending ? 'Enregistrement...' : 'Enregistrer'}
+      </button>
+    )
+  }
+
+  // Bouton pour l'Ajout
+  return (
+    <button 
+      type="submit" 
+      disabled={pending} 
+      className="flex-1 bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all hover:opacity-90 disabled:opacity-70 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2"
+    >
+      {pending && <Loader2 size={18} className="animate-spin" />}
+      {pending ? 'Ajout...' : 'Ajouter'}
+    </button>
+  )
+}
 
 export default function SpoolModal({ isOpen, onClose, refreshData, initialData = null }: any) {
   const [addQuantity, setAddQuantity] = useState(1)
@@ -58,9 +92,16 @@ export default function SpoolModal({ isOpen, onClose, refreshData, initialData =
           <div className="grid grid-cols-2 gap-4"><div><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Prix (€)</label><input type="number" step="0.01" name="price" value={priceInput} onChange={e=>setPriceInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white"/></div><div><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Ouverture</label><input type="date" name="date_opened" value={dateInput} onChange={e=>setDateInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white"/></div></div>
           
           {!initialData ? (
-             <div className="pt-4 flex gap-4"><div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1"><button type="button" onClick={()=>setAddQuantity(Math.max(1,addQuantity-1))} className="p-3 cursor-pointer hover:bg-white dark:hover:bg-black rounded-lg transition-colors"><Minus size={18} className="text-gray-600 dark:text-gray-400"/></button><span className="w-10 text-center font-bold text-gray-900 dark:text-white">{addQuantity}</span><button type="button" onClick={()=>setAddQuantity(Math.min(10,addQuantity+1))} className="p-3 cursor-pointer hover:bg-white dark:hover:bg-black rounded-lg transition-colors"><Plus size={18} className="text-gray-600 dark:text-gray-400"/></button></div><button type="submit" className="flex-1 bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all hover:opacity-90">Ajouter</button></div>
+             <div className="pt-4 flex gap-4">
+                 <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+                     <button type="button" onClick={()=>setAddQuantity(Math.max(1,addQuantity-1))} className="p-3 cursor-pointer hover:bg-white dark:hover:bg-black rounded-lg transition-colors"><Minus size={18} className="text-gray-600 dark:text-gray-400"/></button>
+                     <span className="w-10 text-center font-bold text-gray-900 dark:text-white">{addQuantity}</span>
+                     <button type="button" onClick={()=>setAddQuantity(Math.min(10,addQuantity+1))} className="p-3 cursor-pointer hover:bg-white dark:hover:bg-black rounded-lg transition-colors"><Plus size={18} className="text-gray-600 dark:text-gray-400"/></button>
+                 </div>
+                 <ModalSubmitButton isEdit={false} />
+             </div>
           ) : (
-             <button type="submit" className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:opacity-90">Enregistrer</button>
+             <ModalSubmitButton isEdit={true} />
           )}
         </form>
       </div>

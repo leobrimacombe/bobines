@@ -1,13 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, Suspense } from 'react'
 import { login, signup } from './actions'
 import { useFormStatus } from 'react-dom'
 import { User, Lock, Mail, Disc3, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 
 // --- COMPOSANT BOUTON AVEC CHARGEMENT ---
-// On l'extrait pour pouvoir utiliser useFormStatus()
 function SubmitButton({ 
   children, 
   action, 
@@ -40,14 +39,14 @@ function SubmitButton({
   )
 }
 
-export default function LoginPage() {
+// --- LE CONTENU DE LA PAGE (QUI UTILISE LES PARAMS) ---
+function LoginContent() {
   const [isLoginMode, setIsLoginMode] = useState(true)
   const searchParams = useSearchParams()
   const errorMessage = searchParams.get('message')
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7] dark:bg-black p-6 font-sans transition-colors duration-500">
-      
+    <>
       {/* Conteneur principal style Apple Card */}
       <div className="bg-white dark:bg-[#1C1C1E] w-full max-w-[440px] rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-none border border-gray-100 dark:border-gray-800 overflow-hidden relative z-10 animate-fade">
         
@@ -75,12 +74,14 @@ export default function LoginPage() {
           <div className="relative z-10 flex">
             <button 
               onClick={() => setIsLoginMode(true)}
+              type="button"
               className={`flex-1 py-2 text-xs font-bold rounded-[10px] transition-colors duration-300 cursor-pointer ${isLoginMode ? 'text-black dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
             >
               Connexion
             </button>
             <button 
               onClick={() => setIsLoginMode(false)}
+              type="button"
               className={`flex-1 py-2 text-xs font-bold rounded-[10px] transition-colors duration-300 cursor-pointer ${!isLoginMode ? 'text-black dark:text-white' : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'}`}
             >
               Inscription
@@ -131,7 +132,6 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="pt-4">
-                  {/* BOUTON LOGIN MODIFIÉ */}
                   <SubmitButton action={login} loadingText="Connexion...">
                     Accéder au stock
                   </SubmitButton>
@@ -183,7 +183,6 @@ export default function LoginPage() {
                   </div>
                 </div>
                 <div className="pt-4">
-                  {/* BOUTON SIGNUP MODIFIÉ */}
                   <SubmitButton action={signup} loadingText="Création...">
                     Créer mon compte
                   </SubmitButton>
@@ -193,6 +192,17 @@ export default function LoginPage() {
           </div>
         </div>
       </div>
+    </>
+  )
+}
+
+// --- LA PAGE PRINCIPALE QUI ENVELOPPE TOUT DANS UN SUSPENSE ---
+export default function LoginPage() {
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-[#F5F5F7] dark:bg-black p-6 font-sans transition-colors duration-500">
+      <Suspense fallback={<Loader2 size={48} className="animate-spin text-blue-500" />}>
+        <LoginContent />
+      </Suspense>
 
       {/* Style additionnel pour l'animation d'entrée */}
       <style jsx global>{`
