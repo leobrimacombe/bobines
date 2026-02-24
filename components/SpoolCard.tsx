@@ -6,7 +6,23 @@ import { deleteSpool, consumeSpool } from '../app/actions'
 import { useFormStatus } from 'react-dom'
 import ConfirmModal from './ui/ConfirmModal'
 
-// --- PETIT COMPOSANT BOUTON CONSOMMER ---
+// --- LISTE DES COULEURS BAMBU AVEC REFERENCES ---
+const BAMBU_COLORS = [
+    { name: 'Blanc ivoire', ref: '11100', hex: '#F5F5DC' }, { name: 'Noir Basic', ref: '10101', hex: '#1A1A1A' },
+    { name: 'Blanc os', ref: '11103', hex: '#E3DAC9' }, { name: 'Jaune citron', ref: '11400', hex: '#FFEA00' },
+    { name: 'Mandarine', ref: '11300', hex: '#FF8C00' }, { name: 'Rose sakura', ref: '11201', hex: '#FFB7C5' },
+    { name: 'Violet lilas', ref: '11700', hex: '#C8A2C8' }, { name: 'Prune', ref: '11204', hex: '#8E4585' },
+    { name: 'Rouge écarlate', ref: '11200', hex: '#FF2400' }, { name: 'Rouge foncé', ref: '11202', hex: '#8B0000' },
+    { name: 'Vert pomme', ref: '11502', hex: '#8DB600' }, { name: 'Vert herbacé', ref: '11500', hex: '#5CBA35' },
+    { name: 'Vert foncé', ref: '11501', hex: '#006400' }, { name: 'Bleu glacier', ref: '11601', hex: '#A5F2F3' },
+    { name: 'Bleu ciel', ref: '11603', hex: '#87CEEB' }, { name: 'Bleu marine', ref: '11600', hex: '#000080' },
+    { name: 'Bleu foncé', ref: '11602', hex: '#00008B' }, { name: 'Brun clair du désert', ref: '11401', hex: '#D4B895' },
+    { name: 'Marron latte', ref: '11800', hex: '#C5A059' }, { name: 'Caramel', ref: '11803', hex: '#C68E17' },
+    { name: 'Terre cuite', ref: '11203', hex: '#E2725B' }, { name: 'Marron foncé', ref: '11801', hex: '#5C4033' },
+    { name: 'Chocolat noir', ref: '11802', hex: '#3D1C04' }, { name: 'Gris cendré', ref: '11102', hex: '#B2BEB5' },
+    { name: 'Gris nardo', ref: '11104', hex: '#808487' }, { name: 'Anthracite', ref: '11101', hex: '#383E42' }
+];
+
 function ConsumeButton() {
   const { pending } = useFormStatus()
   return (
@@ -16,7 +32,6 @@ function ConsumeButton() {
   )
 }
 
-// --- PETIT COMPOSANT BOUTON SUPPRIMER ---
 function DeleteButton({ onClick }: { onClick: () => void }) {
   return (
     <button type="button" onClick={onClick} className="text-gray-400 hover:text-red-500 p-2 cursor-pointer transition-all hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg hover:scale-110 active:scale-95">
@@ -31,50 +46,38 @@ export default function SpoolCard({ bobine, lowStockThreshold, refreshData, onEd
     title: '', message: '', action: () => {}, isDanger: false 
   })
 
+  // SECURITE ANTI-CRASH
+  if (!bobine) return null;
+
   const reste = (bobine.weight_initial || 1000) - (bobine.weight_used || 0);
   const pourcent = Math.max(0, Math.min(100, (reste / bobine.weight_initial) * 100));
   const isLow = reste < lowStockThreshold;
   const isOld = (d:string) => d && new Date(d) < new Date(new Date().setMonth(new Date().getMonth()-6));
 
-  // GESTION SUPPRESSION
+  // --- LOGIQUE D'AFFICHAGE DE LA REF ---
+  const isBambu = bobine.brand?.toLowerCase().includes('bambu');
+  const bambuColor = isBambu ? BAMBU_COLORS.find(c => c.name === bobine.color_name) : null;
+  const displayColor = bambuColor ? `${bobine.color_name} #${bambuColor.ref}` : bobine.color_name;
+
   const handleDeleteClick = () => {
     setModalConfig({
-        title: 'Supprimer la bobine ?',
-        message: `Voulez-vous vraiment supprimer la bobine #${bobine.spool_number} ? Elle sera archivée.`,
-        isDanger: true,
-        action: async () => {
-            const formData = new FormData();
-            formData.append('id', bobine.id);
-            await deleteSpool(formData);
-            refreshData();
-            setModalOpen(false);
-        }
+        title: 'Supprimer la bobine ?', message: `Voulez-vous vraiment supprimer la bobine #${bobine.spool_number} ? Elle sera archivée.`, isDanger: true,
+        action: async () => { const fd = new FormData(); fd.append('id', bobine.id); await deleteSpool(fd); refreshData(); setModalOpen(false); }
     });
     setModalOpen(true);
   }
 
-  // GESTION CONSOMMATION + CAS BOBINE VIDE
   const handleConsume = async (formData: FormData) => {
     const amount = parseInt(formData.get('amount') as string);
     if (!amount || amount <= 0) return;
-
     if (reste - amount <= 0) {
-        // CAS SPÉCIAL : BOBINE VIDE
         setModalConfig({
-            title: 'Bobine terminée ?',
-            message: `Cette consommation va vider la bobine (${reste}g restants). Voulez-vous la sortir du stock ?`,
-            isDanger: true,
-            action: async () => {
-                await deleteSpool(formData); // On supprime
-                refreshData();
-                setModalOpen(false);
-            }
+            title: 'Bobine terminée ?', message: `Cette consommation va vider la bobine (${reste}g restants). Voulez-vous la sortir du stock ?`, isDanger: true,
+            action: async () => { await deleteSpool(formData); refreshData(); setModalOpen(false); }
         });
         setModalOpen(true);
     } else {
-        // CAS NORMAL
-        await consumeSpool(formData);
-        refreshData();
+        await consumeSpool(formData); refreshData();
         const input = document.getElementById(`input-${bobine.id}`) as HTMLInputElement;
         if (input) input.value = '';
     }
@@ -92,7 +95,11 @@ export default function SpoolCard({ bobine, lowStockThreshold, refreshData, onEd
             </div>
             <div className="p-5 flex-1 flex flex-col">
                 <div className="flex justify-between items-start mb-4">
-                    <div className="flex-1 min-w-0"><h3 className="font-bold text-lg leading-tight truncate text-gray-900 dark:text-white">{bobine.material}</h3><p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">{bobine.color_name}</p></div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-lg leading-tight truncate text-gray-900 dark:text-white">{bobine.material}</h3>
+                        {/* AFFICHAGE AVEC REF ICI */}
+                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wide">{displayColor}</p>
+                    </div>
                     <div className="flex gap-1">
                         <button onClick={() => onEdit(bobine)} className="text-gray-400 hover:text-blue-600 p-2 cursor-pointer transition-all hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg hover:scale-110 active:scale-95"><Edit2 size={16} /></button>
                         <DeleteButton onClick={handleDeleteClick} />
@@ -108,16 +115,7 @@ export default function SpoolCard({ bobine, lowStockThreshold, refreshData, onEd
                 </form>
             </div>
         </div>
-
-        {/* MODALE DE CONFIRMATION */}
-        <ConfirmModal 
-            isOpen={modalOpen}
-            title={modalConfig.title}
-            message={modalConfig.message}
-            onConfirm={modalConfig.action}
-            onCancel={() => setModalOpen(false)}
-            isDanger={modalConfig.isDanger}
-        />
+        <ConfirmModal isOpen={modalOpen} title={modalConfig.title} message={modalConfig.message} onConfirm={modalConfig.action} onCancel={() => setModalOpen(false)} isDanger={modalConfig.isDanger} />
     </>
   )
 }

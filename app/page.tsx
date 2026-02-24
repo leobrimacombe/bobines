@@ -5,7 +5,7 @@ import { createClient } from '../utils/supabase/client'
 import { updateThreshold, revertConsumption } from './actions'
 import { Search, Plus, Minus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useFormStatus } from 'react-dom' // <-- NOUVEL IMPORT ICI
+import { useFormStatus } from 'react-dom'
 import FilamentCharts from '../components/FilamentCharts'
 import Header from '../components/Header'
 import SpoolModal from '../components/SpoolModal'
@@ -13,17 +13,26 @@ import GroupDetailsModal from '../components/GroupDetailsModal'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import { BrandLogo } from '../components/ui/BrandLogo'
 
-// --- NOUVEAU BOUTON D'ANNULATION AVEC CHARGEMENT ---
+const BAMBU_COLORS = [
+    { name: 'Blanc ivoire', ref: '11100', hex: '#F5F5DC' }, { name: 'Noir Basic', ref: '10101', hex: '#1A1A1A' },
+    { name: 'Blanc os', ref: '11103', hex: '#E3DAC9' }, { name: 'Jaune citron', ref: '11400', hex: '#FFEA00' },
+    { name: 'Mandarine', ref: '11300', hex: '#FF8C00' }, { name: 'Rose sakura', ref: '11201', hex: '#FFB7C5' },
+    { name: 'Violet lilas', ref: '11700', hex: '#C8A2C8' }, { name: 'Prune', ref: '11204', hex: '#8E4585' },
+    { name: 'Rouge écarlate', ref: '11200', hex: '#FF2400' }, { name: 'Rouge foncé', ref: '11202', hex: '#8B0000' },
+    { name: 'Vert pomme', ref: '11502', hex: '#8DB600' }, { name: 'Vert herbacé', ref: '11500', hex: '#5CBA35' },
+    { name: 'Vert foncé', ref: '11501', hex: '#006400' }, { name: 'Bleu glacier', ref: '11601', hex: '#A5F2F3' },
+    { name: 'Bleu ciel', ref: '11603', hex: '#87CEEB' }, { name: 'Bleu marine', ref: '11600', hex: '#000080' },
+    { name: 'Bleu foncé', ref: '11602', hex: '#00008B' }, { name: 'Brun clair du désert', ref: '11401', hex: '#D4B895' },
+    { name: 'Marron latte', ref: '11800', hex: '#C5A059' }, { name: 'Caramel', ref: '11803', hex: '#C68E17' },
+    { name: 'Terre cuite', ref: '11203', hex: '#E2725B' }, { name: 'Marron foncé', ref: '11801', hex: '#5C4033' },
+    { name: 'Chocolat noir', ref: '11802', hex: '#3D1C04' }, { name: 'Gris cendré', ref: '11102', hex: '#B2BEB5' },
+    { name: 'Gris nardo', ref: '11104', hex: '#808487' }, { name: 'Anthracite', ref: '11101', hex: '#383E42' }
+];
+
 function RevertButton() {
   const { pending } = useFormStatus()
-  
   return (
-    <button 
-      type="submit" 
-      disabled={pending}
-      className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-[10px] font-bold uppercase tracking-wide cursor-pointer border border-red-100 dark:border-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed" 
-      title="Annuler (Rembourser)"
-    >
+    <button type="submit" disabled={pending} className="flex items-center gap-1.5 px-3 py-1 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-[10px] font-bold uppercase tracking-wide cursor-pointer border border-red-100 dark:border-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed" title="Annuler (Rembourser)">
       {pending ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
       {pending ? 'Annulation...' : 'Annuler'}
     </button>
@@ -45,7 +54,6 @@ export default function Home() {
   const [search, setSearch] = useState('')
   const [filterMaterial, setFilterMaterial] = useState('Tous')
   
-  // MODALES
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingBobine, setEditingBobine] = useState<any>(null)
   const [prefillData, setPrefillData] = useState<any>(null)
@@ -68,9 +76,7 @@ export default function Home() {
         setHistory(logs || [])
 
         const { data: settings } = await supabase.from('user_settings').select('*').single()
-        if (settings) {
-            setLowStockThreshold(settings.low_stock_threshold || 200)
-        }
+        if (settings) setLowStockThreshold(settings.low_stock_threshold || 200)
 
         const { data: gSettings } = await supabase.from('group_settings').select('*')
         setGroupSettings(gSettings || [])
@@ -99,7 +105,6 @@ export default function Home() {
     return matchSearch && (filterMaterial === 'Tous' || b.material === filterMaterial)
   })
 
-  // GROUPEMENT DES BOBINES (SKU) + COMPTAGE DES BOBINES COMPLETES
   const groupedSpools = useMemo(() => {
     const groups: Record<string, any> = {};
 
@@ -108,32 +113,20 @@ export default function Home() {
         if (!groups[key]) {
             const setting = groupSettings.find(s => s.brand === b.brand && s.material === b.material && s.color_name === b.color_name);
             groups[key] = {
-                key: key,
-                brand: b.brand,
-                material: b.material,
-                color_name: b.color_name,
-                color_hex: b.color_hex,
-                spools: [],
-                totalWeight: 0,
-                totalRemaining: 0,
-                fullSpoolsCount: 0,
+                key: key, brand: b.brand, material: b.material, color_name: b.color_name, color_hex: b.color_hex,
+                spools: [], totalWeight: 0, totalRemaining: 0, fullSpoolsCount: 0,
                 minSpools: setting ? setting.min_spools : 1
             };
         }
         groups[key].spools.push(b);
-        const remaining = (b.weight_initial || 1000) - (b.weight_used || 0);
         groups[key].totalWeight += (b.weight_initial || 1000);
-        groups[key].totalRemaining += remaining;
-        
-        if ((b.weight_used || 0) === 0) {
-            groups[key].fullSpoolsCount += 1;
-        }
+        groups[key].totalRemaining += (b.weight_initial || 1000) - (b.weight_used || 0);
+        if ((b.weight_used || 0) === 0) groups[key].fullSpoolsCount += 1;
     });
 
     return groups;
   }, [filteredBobines, groupSettings]);
 
-  // ALERTE SI LE NOMBRE DE BOBINES COMPLETES EST SOUS LE SEUIL
   const groupAlerts = useMemo(() => {
     return Object.values(groupedSpools).filter((g: any) => g.fullSpoolsCount < g.minSpools);
   }, [groupedSpools]);
@@ -164,23 +157,12 @@ export default function Home() {
 
   const handleSettingsSubmit = (formData: FormData) => {
     setConfirmModal({
-        isOpen: true,
-        title: 'Sauvegarder les réglages ?',
-        message: 'Ce seuil global s\'appliquera immédiatement.',
-        isDanger: false,
-        action: async () => {
-            await updateThreshold(formData);
-            fetchData();
-            setConfirmModal(prev => ({ ...prev, isOpen: false }));
-        }
+        isOpen: true, title: 'Sauvegarder les réglages ?', message: 'Ce seuil global s\'appliquera immédiatement.', isDanger: false,
+        action: async () => { await updateThreshold(formData); fetchData(); setConfirmModal(prev => ({ ...prev, isOpen: false })); }
     });
   };
 
-  const openAddModal = (groupData: any = null) => {
-      setEditingBobine(null);
-      setPrefillData(groupData);
-      setIsModalOpen(true);
-  }
+  const openAddModal = (groupData: any = null) => { setEditingBobine(null); setPrefillData(groupData); setIsModalOpen(true); }
 
   if (isLoading) return (<div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex items-center justify-center"><Loader2 className="w-10 h-10 text-blue-500 animate-spin" /></div>);
   if (!user) return <div className="bg-[#F5F5F7] dark:bg-black min-h-screen"></div>
@@ -210,11 +192,18 @@ export default function Home() {
                         <p className="text-orange-600 dark:text-orange-400 text-xs font-bold uppercase tracking-wide">Réappro. Conseillé</p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {groupAlerts.map((a: any, i) => (
-                            <span onClick={() => setSelectedGroupKey(a.key)} key={i} className="bg-white dark:bg-[#2C2C2E] text-orange-600 dark:text-orange-300 border border-orange-100 dark:border-orange-900/30 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm cursor-pointer hover:bg-orange-50 transition-colors">
-                                {a.fullSpoolsCount}/{a.minSpools} complètes • {a.brand} {a.material} <span className="text-orange-800 dark:text-orange-100 opacity-80 font-bold ml-1">{a.color_name}</span>
-                            </span>
-                        ))}
+                        {groupAlerts.map((a: any, i) => {
+                            // --- LOGIQUE AFFICHAGE REF SUR ALERTE ---
+                            const isBambu = a.brand?.toLowerCase().includes('bambu');
+                            const bambuColor = isBambu ? BAMBU_COLORS.find(c => c.name === a.color_name) : null;
+                            const displayColor = bambuColor ? `${a.color_name} #${bambuColor.ref}` : a.color_name;
+
+                            return (
+                              <span onClick={() => setSelectedGroupKey(a.key)} key={i} className="bg-white dark:bg-[#2C2C2E] text-orange-600 dark:text-orange-300 border border-orange-100 dark:border-orange-900/30 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm cursor-pointer hover:bg-orange-50 transition-colors">
+                                  {a.fullSpoolsCount}/{a.minSpools} complètes • {a.brand} {a.material} <span className="text-orange-800 dark:text-orange-100 opacity-80 font-bold ml-1">{displayColor}</span>
+                              </span>
+                            )
+                        })}
                     </div>
                 </div>
               ) : (
@@ -243,13 +232,19 @@ export default function Home() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                       {brandGroups.map((group: any) => {
                           const isAlert = group.fullSpoolsCount < group.minSpools;
+                          
+                          // --- LOGIQUE AFFICHAGE REF SUR GROUPE CARDS ---
+                          const isBambu = group.brand?.toLowerCase().includes('bambu');
+                          const bambuColor = isBambu ? BAMBU_COLORS.find(c => c.name === group.color_name) : null;
+                          const displayColor = bambuColor ? `${group.color_name} #${bambuColor.ref}` : group.color_name;
+
                           return (
                             <div key={group.key} onClick={() => setSelectedGroupKey(group.key)} className={`bg-white dark:bg-[#1C1C1E] rounded-2xl p-5 border transition-all duration-300 flex flex-col group/card hover:-translate-y-1 cursor-pointer ${isAlert ? 'border-orange-200 shadow-orange-50 hover:shadow-orange-100' : 'border-gray-100 dark:border-gray-800 shadow-sm hover:shadow-xl'}`}>
                                 <div className="flex items-center gap-4 mb-6">
                                     <div className="w-10 h-10 rounded-full border border-gray-100 dark:border-gray-800 shadow-sm shrink-0" style={{backgroundColor: group.color_hex}} />
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-lg dark:text-white leading-tight truncate">{group.material}</h3>
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider truncate">{group.color_name}</p>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider truncate">{displayColor}</p>
                                     </div>
                                 </div>
                                 <div className="flex justify-between items-end mt-auto">
@@ -293,18 +288,14 @@ export default function Home() {
                                 <p className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{new Date(log.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</p>
                                 <div className="flex items-center gap-2 mt-1">
                                     <p className="font-bold text-sm text-gray-900 dark:text-white">{log.spool_name}</p>
-                                    
-                                    {/* UTILISATION DU NOUVEAU BOUTON ICI */}
                                     <form action={async (f) => { 
                                         if (window.confirm('Annuler cette consommation ? Le poids sera rajouté au stock.')) {
-                                            await revertConsumption(f); 
-                                            fetchData(); 
+                                            await revertConsumption(f); fetchData(); 
                                         }
                                     }}>
                                         <input type="hidden" name="log_id" value={log.id} />
                                         <RevertButton />
                                     </form>
-
                                 </div>
                             </div>
                             <div className="text-right">
