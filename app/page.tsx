@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../utils/supabase/client'
-import { updateThreshold, revertConsumption } from './actions'
-import { Search, Plus, Minus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw } from 'lucide-react'
+import { updateThreshold, revertConsumption, restoreSpool } from './actions'
+import { Search, Plus, Minus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw, Archive } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useFormStatus } from 'react-dom'
 import FilamentCharts from '../components/FilamentCharts'
@@ -39,8 +39,19 @@ function RevertButton() {
   )
 }
 
+function RestoreSpoolButton() {
+  const { pending } = useFormStatus()
+  return (
+    <button type="submit" disabled={pending} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-xs font-bold cursor-pointer border border-gray-200 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Remettre dans le stock">
+      {pending ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+      {pending ? 'Restauration...' : 'Restaurer'}
+    </button>
+  )
+}
+
 export default function Home() {
   const [bobines, setBobines] = useState<any[]>([])
+  const [archivedSpools, setArchivedSpools] = useState<any[]>([]) 
   const [history, setHistory] = useState<any[]>([])
   const [groupSettings, setGroupSettings] = useState<any[]>([])
   
@@ -69,14 +80,19 @@ export default function Home() {
         if (!user) { router.push('/login'); return; }
         setUser(user)
 
-        const { data: spools } = await supabase.from('spools').select('*').eq('archived', false).order('spool_number', { ascending: true })
-        setBobines(spools || [])
+        const { data: allSpools } = await supabase.from('spools').select('*').order('spool_number', { ascending: true })
+        if (allSpools) {
+            setBobines(allSpools.filter(s => !s.archived))
+            setArchivedSpools(allSpools.filter(s => s.archived))
+        }
 
         const { data: logs } = await supabase.from('consumption_logs').select(`*, spools (price, weight_initial)`).order('created_at', { ascending: false }).limit(500)
         setHistory(logs || [])
 
         const { data: settings } = await supabase.from('user_settings').select('*').single()
-        if (settings) setLowStockThreshold(settings.low_stock_threshold || 200)
+        if (settings) {
+            setLowStockThreshold(settings.low_stock_threshold || 200)
+        }
 
         const { data: gSettings } = await supabase.from('group_settings').select('*')
         setGroupSettings(gSettings || [])
@@ -193,11 +209,9 @@ export default function Home() {
                     </div>
                     <div className="flex flex-wrap gap-2">
                         {groupAlerts.map((a: any, i) => {
-                            // --- LOGIQUE AFFICHAGE REF SUR ALERTE ---
                             const isBambu = a.brand?.toLowerCase().includes('bambu');
                             const bambuColor = isBambu ? BAMBU_COLORS.find(c => c.name === a.color_name) : null;
                             const displayColor = bambuColor ? `${a.color_name} #${bambuColor.ref}` : a.color_name;
-
                             return (
                               <span onClick={() => setSelectedGroupKey(a.key)} key={i} className="bg-white dark:bg-[#2C2C2E] text-orange-600 dark:text-orange-300 border border-orange-100 dark:border-orange-900/30 text-xs font-semibold px-3 py-1.5 rounded-full shadow-sm cursor-pointer hover:bg-orange-50 transition-colors">
                                   {a.fullSpoolsCount}/{a.minSpools} complètes • {a.brand} {a.material} <span className="text-orange-800 dark:text-orange-100 opacity-80 font-bold ml-1">{displayColor}</span>
@@ -232,8 +246,6 @@ export default function Home() {
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                       {brandGroups.map((group: any) => {
                           const isAlert = group.fullSpoolsCount < group.minSpools;
-                          
-                          // --- LOGIQUE AFFICHAGE REF SUR GROUPE CARDS ---
                           const isBambu = group.brand?.toLowerCase().includes('bambu');
                           const bambuColor = isBambu ? BAMBU_COLORS.find(c => c.name === group.color_name) : null;
                           const displayColor = bambuColor ? `${group.color_name} #${bambuColor.ref}` : group.color_name;
@@ -271,14 +283,64 @@ export default function Home() {
           </>
         ) : activeTab === 'history' ? (
           <div className="max-w-4xl mx-auto space-y-8 animate-fade">
+             
+             {/* ZONE : BOBINES TERMINÉES */}
+             {archivedSpools.length > 0 && (
+                <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 mb-8 animate-fade">
+                    <div className="flex justify-between items-center mb-6">
+                        <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                            <Archive className="text-orange-500" /> Bobines terminées
+                        </h2>
+                        <div className="flex items-center gap-2">
+                            <span className="text-xs font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-500 px-3 py-1.5 rounded-full" title="Valeur totale des bobines terminées">
+                                {archivedSpools.reduce((acc, s) => acc + (s.price || 0), 0).toFixed(2)} €
+                            </span>
+                            <span className="text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-500 px-3 py-1.5 rounded-full">
+                                {archivedSpools.length}
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {archivedSpools.map(spool => {
+                            const isBambu = spool.brand?.toLowerCase().includes('bambu');
+                            const bambuColor = isBambu ? BAMBU_COLORS.find(c => c.name === spool.color_name) : null;
+                            const displayColor = bambuColor ? `${spool.color_name} #${bambuColor.ref}` : spool.color_name;
+
+                            return (
+                                <div key={spool.id} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 transition-colors">
+                                    <div className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm shrink-0" style={{backgroundColor: spool.color_hex}} />
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-sm dark:text-white leading-tight truncate">{spool.brand} {spool.material}</h3>
+                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider truncate mb-1">{displayColor} <span className="text-gray-400">#{spool.spool_number}</span></p>
+                                        
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-medium bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300">{spool.weight_initial}g</span>
+                                            {spool.price > 0 && <span className="text-[10px] font-bold text-blue-500">{spool.price.toFixed(2)} €</span>}
+                                            {spool.date_opened && <span className="text-[10px] text-gray-400">Ajouté au stocke le : {new Date(spool.date_opened).toLocaleDateString('fr-FR')}</span>}
+                                        </div>
+                                    </div>
+                                    <form action={async (f) => { await restoreSpool(f); fetchData(); }}>
+                                        <input type="hidden" name="id" value={spool.id} />
+                                        <RestoreSpoolButton />
+                                    </form>
+                                </div>
+                            )
+                        })}
+                    </div>
+                </div>
+             )}
+
              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white"><History className="text-blue-500"/> Vue d'ensemble</h2>
+                <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white"><History className="text-blue-500"/> Vue d'ensemble des consos</h2>
                 <div className="relative">
                     <select value={historyRange} onChange={(e) => setHistoryRange(e.target.value as any)} className="appearance-none bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 py-2 pl-4 pr-10 rounded-xl text-sm font-bold cursor-pointer outline-none focus:ring-2 focus:ring-blue-500/20"><option value="30">30 derniers jours</option><option value="90">3 derniers mois</option><option value="180">6 derniers mois</option><option value="365">1 an</option><option value="all">Tout l'historique</option></select>
                     <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"/>
                 </div>
              </div>
+             
              {filteredHistory.length > 0 && <FilamentCharts logs={filteredHistory} />}
+             
              <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800">
                  <h2 className="text-xl font-bold mb-6 text-gray-900 dark:text-white">Détail des consommations</h2>
                  <div className="space-y-3">
