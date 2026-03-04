@@ -2,8 +2,8 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../utils/supabase/client'
-import { updateThreshold, revertConsumption, restoreSpool } from './actions'
-import { Search, Plus, Minus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw, Archive } from 'lucide-react'
+import { updateThreshold, revertConsumption, restoreSpool, hideSpool, hardDeleteSpool } from './actions'
+import { Search, Plus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw, Archive, X, Trash2, Database } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useFormStatus } from 'react-dom'
 import FilamentCharts from '../components/FilamentCharts'
@@ -39,19 +39,39 @@ function RevertButton() {
   )
 }
 
-function RestoreSpoolButton() {
-  const { pending } = useFormStatus()
-  return (
-    <button type="submit" disabled={pending} className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors text-xs font-bold cursor-pointer border border-gray-200 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Remettre dans le stock">
-      {pending ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
-      {pending ? 'Restauration...' : 'Restaurer'}
-    </button>
-  )
+function RestoreButton() {
+    const { pending } = useFormStatus()
+    return (
+        <button type="submit" disabled={pending} className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors text-xs font-bold cursor-pointer border border-blue-100 dark:border-blue-900/30 disabled:opacity-50 disabled:cursor-not-allowed" title="Remettre dans le stock">
+            {pending ? <Loader2 size={14} className="animate-spin" /> : <RotateCcw size={14} />}
+            Restaurer
+        </button>
+    )
+}
+
+function HideButton() {
+    const { pending } = useFormStatus()
+    return (
+        <button type="submit" disabled={pending} className="w-full flex items-center justify-center px-3 py-2 bg-gray-100 dark:bg-gray-800 text-gray-500 hover:text-orange-500 rounded-lg hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors text-xs font-bold cursor-pointer border border-gray-200 dark:border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed" title="Cacher de la liste">
+            {pending ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+        </button>
+    )
+}
+
+// Bouton de suppression brutale pour le menu super-admin
+function HardDeleteButton() {
+    const { pending } = useFormStatus()
+    return (
+        <button type="submit" disabled={pending} className="p-2.5 bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/40 rounded-xl transition-colors shadow-sm border border-red-100 dark:border-red-900/30 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer" title="Supprimer définitivement de la BDD">
+            {pending ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+        </button>
+    )
 }
 
 export default function Home() {
   const [bobines, setBobines] = useState<any[]>([])
   const [archivedSpools, setArchivedSpools] = useState<any[]>([]) 
+  const [allArchivedSpools, setAllArchivedSpools] = useState<any[]>([]) // TOUTES les archives (même cachées)
   const [history, setHistory] = useState<any[]>([])
   const [groupSettings, setGroupSettings] = useState<any[]>([])
   
@@ -66,6 +86,7 @@ export default function Home() {
   const [filterMaterial, setFilterMaterial] = useState('Tous')
   
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isFullHistoryModalOpen, setIsFullHistoryModalOpen] = useState(false) // Modale super-admin
   const [editingBobine, setEditingBobine] = useState<any>(null)
   const [prefillData, setPrefillData] = useState<any>(null)
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
@@ -83,7 +104,9 @@ export default function Home() {
         const { data: allSpools } = await supabase.from('spools').select('*').order('spool_number', { ascending: true })
         if (allSpools) {
             setBobines(allSpools.filter(s => !s.archived))
-            setArchivedSpools(allSpools.filter(s => s.archived))
+            setArchivedSpools(allSpools.filter(s => s.archived && !s.is_hidden).sort((a, b) => new Date(b.finished_at || 0).getTime() - new Date(a.finished_at || 0).getTime()))
+            // On sauvegarde l'intégralité des archives (y compris les cachées) pour le bouton super-admin
+            setAllArchivedSpools(allSpools.filter(s => s.archived).sort((a, b) => new Date(b.finished_at || 0).getTime() - new Date(a.finished_at || 0).getTime()))
         }
 
         const { data: logs } = await supabase.from('consumption_logs').select(`*, spools (price, weight_initial)`).order('created_at', { ascending: false }).limit(500)
@@ -284,15 +307,15 @@ export default function Home() {
         ) : activeTab === 'history' ? (
           <div className="max-w-4xl mx-auto space-y-8 animate-fade">
              
-             {/* ZONE : BOBINES TERMINÉES */}
+             {/* ZONE : BOBINES TERMINÉES VISIBLES */}
              {archivedSpools.length > 0 && (
-                <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 mb-8 animate-fade">
+                <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-fade">
                     <div className="flex justify-between items-center mb-6">
                         <h2 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
                             <Archive className="text-orange-500" /> Bobines terminées
                         </h2>
                         <div className="flex items-center gap-2">
-                            <span className="text-xs font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-500 px-3 py-1.5 rounded-full" title="Valeur totale des bobines terminées">
+                            <span className="text-xs font-bold bg-blue-50 dark:bg-blue-900/20 text-blue-500 px-3 py-1.5 rounded-full" title="Valeur totale des bobines terminées affichées">
                                 {archivedSpools.reduce((acc, s) => acc + (s.price || 0), 0).toFixed(2)} €
                             </span>
                             <span className="text-xs font-bold bg-gray-100 dark:bg-gray-800 text-gray-500 px-3 py-1.5 rounded-full">
@@ -301,29 +324,38 @@ export default function Home() {
                         </div>
                     </div>
                     
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                         {archivedSpools.map(spool => {
                             const isBambu = spool.brand?.toLowerCase().includes('bambu');
                             const bambuColor = isBambu ? BAMBU_COLORS.find(c => c.name === spool.color_name) : null;
                             const displayColor = bambuColor ? `${spool.color_name} #${bambuColor.ref}` : spool.color_name;
 
                             return (
-                                <div key={spool.id} className="flex items-center gap-4 p-4 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 transition-colors">
-                                    <div className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm shrink-0" style={{backgroundColor: spool.color_hex}} />
-                                    <div className="flex-1 min-w-0">
-                                        <h3 className="font-bold text-sm dark:text-white leading-tight truncate">{spool.brand} {spool.material}</h3>
-                                        <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider truncate mb-1">{displayColor} <span className="text-gray-400">#{spool.spool_number}</span></p>
-                                        
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[10px] font-medium bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300">{spool.weight_initial}g</span>
-                                            {spool.price > 0 && <span className="text-[10px] font-bold text-blue-500">{spool.price.toFixed(2)} €</span>}
-                                            {spool.date_opened && <span className="text-[10px] text-gray-400">Ajouté au stocke le : {new Date(spool.date_opened).toLocaleDateString('fr-FR')}</span>}
+                                <div key={spool.id} className="flex flex-col gap-4 p-5 bg-gray-50 dark:bg-[#2C2C2E] rounded-2xl border border-gray-100 dark:border-gray-700 hover:border-gray-200 dark:hover:border-gray-600 transition-colors">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-600 shadow-sm shrink-0" style={{backgroundColor: spool.color_hex}} />
+                                        <div className="flex-1 min-w-0">
+                                            <h3 className="font-bold text-sm dark:text-white leading-tight truncate">{spool.brand} {spool.material}</h3>
+                                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider truncate mb-1">{displayColor} <span className="text-gray-400">#{spool.spool_number}</span></p>
+                                            
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <span className="text-[10px] font-medium bg-gray-200 dark:bg-gray-600 px-1.5 py-0.5 rounded text-gray-600 dark:text-gray-300">{spool.weight_initial}g</span>
+                                                {spool.price > 0 && <span className="text-[10px] font-bold text-blue-500">{spool.price.toFixed(2)} €</span>}
+                                                {spool.finished_at && <span className="text-[10px] font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded">Terminée le {new Date(spool.finished_at).toLocaleDateString('fr-FR')}</span>}
+                                            </div>
                                         </div>
                                     </div>
-                                    <form action={async (f) => { await restoreSpool(f); fetchData(); }}>
-                                        <input type="hidden" name="id" value={spool.id} />
-                                        <RestoreSpoolButton />
-                                    </form>
+                                    
+                                    <div className="flex gap-2">
+                                        <form action={async (f) => { await restoreSpool(f); fetchData(); }} className="flex-1 flex">
+                                            <input type="hidden" name="id" value={spool.id} />
+                                            <RestoreButton />
+                                        </form>
+                                        <form action={async (f) => { await hideSpool(f); fetchData(); }} className="flex">
+                                            <input type="hidden" name="id" value={spool.id} />
+                                            <HideButton />
+                                        </form>
+                                    </div>
                                 </div>
                             )
                         })}
@@ -331,7 +363,7 @@ export default function Home() {
                 </div>
              )}
 
-             <div className="flex justify-between items-center mb-6">
+             <div className="flex justify-between items-center mb-6 pt-4">
                 <h2 className="text-xl font-bold flex items-center gap-2 text-gray-900 dark:text-white"><History className="text-blue-500"/> Vue d'ensemble des consos</h2>
                 <div className="relative">
                     <select value={historyRange} onChange={(e) => setHistoryRange(e.target.value as any)} className="appearance-none bg-white dark:bg-[#1C1C1E] border border-gray-200 dark:border-gray-800 text-gray-700 dark:text-gray-300 py-2 pl-4 pr-10 rounded-xl text-sm font-bold cursor-pointer outline-none focus:ring-2 focus:ring-blue-500/20"><option value="30">30 derniers jours</option><option value="90">3 derniers mois</option><option value="180">6 derniers mois</option><option value="365">1 an</option><option value="all">Tout l'historique</option></select>
@@ -370,6 +402,15 @@ export default function Home() {
                     ))}
                  </div>
              </div>
+
+             {/* BOUTON HISTORIQUE COMPLET TOUT EN BAS */}
+             <div className="flex justify-center pt-8 pb-4">
+                <button onClick={() => setIsFullHistoryModalOpen(true)} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl font-bold text-sm transition-all border border-gray-200 dark:border-gray-800 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-0.5">
+                    <Database size={18} />
+                    Accéder aux archives complètes (Toutes les bobines)
+                </button>
+             </div>
+
           </div>
         ) : (
           <div className="max-w-xl mx-auto bg-white dark:bg-[#1C1C1E] p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-fade">
@@ -400,6 +441,78 @@ export default function Home() {
         isOpen={confirmModal.isOpen} title={confirmModal.title} message={confirmModal.message}
         onConfirm={confirmModal.action} onCancel={() => setConfirmModal(prev => ({ ...prev, isOpen: false }))} isDanger={confirmModal.isDanger}
       />
+
+      {/* MODALE SUPER-ADMIN : ARCHIVES COMPLETES */}
+      {isFullHistoryModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[60] flex items-center justify-center p-4 animate-fade">
+            <div className="bg-[#F5F5F7] dark:bg-black w-full max-w-4xl h-[85vh] rounded-3xl flex flex-col overflow-hidden shadow-2xl border dark:border-gray-800 animate-modal">
+                <div className="bg-white dark:bg-[#1C1C1E] p-6 border-b border-gray-100 dark:border-gray-800 flex justify-between items-center shrink-0">
+                    <div>
+                        <h2 className="text-2xl font-bold dark:text-white flex items-center gap-2">
+                            <Database className="text-blue-500" /> Archives Complètes
+                        </h2>
+                        <p className="text-xs text-gray-500 mt-1 font-medium">Toutes les bobines terminées ou cachées depuis la création de votre compte.</p>
+                    </div>
+                    <button onClick={() => setIsFullHistoryModalOpen(false)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full cursor-pointer hover:bg-gray-200 transition-colors"><X size={24} className="text-gray-600 dark:text-gray-400"/></button>
+                </div>
+                
+                <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-4">
+                    {allArchivedSpools.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400 font-medium">Aucune archive dans la base de données.</div>
+                    ) : (
+                        allArchivedSpools.map(spool => {
+                            const isBambu = spool.brand?.toLowerCase().includes('bambu');
+                            const bambuColor = isBambu ? BAMBU_COLORS.find(c => c.name === spool.color_name) : null;
+                            const displayColor = bambuColor ? `${spool.color_name} #${bambuColor.ref}` : spool.color_name;
+
+                            return (
+                                <div key={spool.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-white dark:bg-[#1C1C1E] rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-10 h-10 rounded-full border border-gray-200 dark:border-gray-700 shadow-sm shrink-0" style={{backgroundColor: spool.color_hex}} />
+                                        <div>
+                                            <h3 className="font-bold text-sm dark:text-white leading-tight">
+                                                {spool.brand} {spool.material} <span className="text-gray-400 font-normal ml-1">#{spool.spool_number}</span>
+                                            </h3>
+                                            <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">{displayColor}</p>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center justify-between sm:justify-end gap-6">
+                                        <div className="text-right">
+                                            {spool.finished_at ? (
+                                                <p className="text-xs text-gray-500">Terminée le {new Date(spool.finished_at).toLocaleDateString('fr-FR')}</p>
+                                            ) : (
+                                                <p className="text-xs text-gray-400 italic">Ancienne archive</p>
+                                            )}
+                                            {spool.is_hidden && <span className="text-[10px] font-bold text-orange-500 bg-orange-50 dark:bg-orange-900/20 px-1.5 py-0.5 rounded uppercase tracking-widest mt-1 inline-block">Cachée</span>}
+                                        </div>
+                                        
+                                        <div className="flex gap-2">
+                                            <form action={async (f) => { await restoreSpool(f); fetchData(); }}>
+                                                <input type="hidden" name="id" value={spool.id} />
+                                                <button type="submit" className="p-2.5 bg-gray-50 dark:bg-gray-800 text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded-xl transition-colors shadow-sm border border-gray-200 dark:border-gray-700 cursor-pointer" title="Restaurer dans le stock">
+                                                    <RotateCcw size={16} />
+                                                </button>
+                                            </form>
+                                            <form action={async (f) => { 
+                                                if(window.confirm('ATTENTION ! Supprimer définitivement cette bobine effacera aussi son historique de coût financier. Voulez-vous vraiment continuer ?')) {
+                                                    await hardDeleteSpool(f); fetchData();
+                                                }
+                                            }}>
+                                                <input type="hidden" name="id" value={spool.id} />
+                                                <HardDeleteButton />
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            )
+                        })
+                    )}
+                </div>
+            </div>
+        </div>
+      )}
+
     </div>
   )
 }
