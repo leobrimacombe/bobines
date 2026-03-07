@@ -50,14 +50,7 @@ export async function deleteSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
   
-  await supabase
-    .from('spools')
-    .update({ 
-      archived: true, 
-      finished_at: new Date().toISOString() 
-    })
-    .eq('id', id)
-
+  await supabase.from('spools').update({ archived: true, finished_at: new Date().toISOString() }).eq('id', id)
   revalidatePath('/')
 }
 
@@ -65,14 +58,7 @@ export async function restoreSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
   
-  await supabase
-    .from('spools')
-    .update({ 
-      archived: false, 
-      finished_at: null 
-    })
-    .eq('id', id)
-
+  await supabase.from('spools').update({ archived: false, finished_at: null }).eq('id', id)
   revalidatePath('/')
 }
 
@@ -80,25 +66,16 @@ export async function hideSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
   
-  await supabase
-    .from('spools')
-    .update({ is_hidden: true })
-    .eq('id', id)
-
+  await supabase.from('spools').update({ is_hidden: true }).eq('id', id)
   revalidatePath('/')
 }
 
-// --- NOUVELLE FONCTION : SUPPRESSION DÉFINITIVE DE LA BDD ---
 export async function hardDeleteSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
 
-  // 1. On supprime d'abord les consommations liées pour éviter les erreurs
   await supabase.from('consumption_logs').delete().eq('spool_id', id)
-  
-  // 2. On supprime définitivement la bobine
   await supabase.from('spools').delete().eq('id', id)
-
   revalidatePath('/')
 }
 
@@ -145,19 +122,26 @@ export async function updateSpool(formData: FormData) {
   revalidatePath('/')
 }
 
-export async function updateThreshold(formData: FormData) {
+// --- FONCTION DE SAUVEGARDE GLOBALE DES PARAMÈTRES ET PRÉRÉGLAGES ---
+export async function updateSettings(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
   const threshold = parseInt(formData.get('threshold') as string)
-  const similarThreshold = parseInt(formData.get('similar_threshold') as string)
+  
+  // Récupération des tableaux envoyés depuis l'interface
+  const custom_brands = JSON.parse(formData.get('custom_brands') as string || '[]')
+  const custom_materials = JSON.parse(formData.get('custom_materials') as string || '[]')
+  const custom_colors = JSON.parse(formData.get('custom_colors') as string || '[]')
 
   await supabase.from('user_settings').upsert({ 
     user_id: user.id, 
-    low_stock_threshold: threshold,
-    similar_stock_threshold: similarThreshold
-  })
+    low_stock_threshold: threshold || 200,
+    custom_brands,
+    custom_materials,
+    custom_colors
+  }, { onConflict: 'user_id' })
   
   revalidatePath('/')
 }

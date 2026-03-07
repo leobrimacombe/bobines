@@ -9,37 +9,22 @@ import { useFormStatus } from 'react-dom'
 const SUGGESTED_BRANDS = ["Bambu Lab", "Sunlu", "eSUN", "Prusament", "Creality", "Eryone", "PolyMaker", "Amazon Basics", "Geeetech", "Anycubic", "Overture"];
 const SUGGESTED_MATERIALS = ["PLA", "PLA Basic", "PLA Matte", "PLA Tough+", "PLA Silk+", "PLA Translucent", "PLA Silk Multi-Color", "PLA Wood", "PLA Basic Gradient", "PLA Galaxy", "PLA Metal", "PLA Marble", "PLA Glow", "PLA Sparkle", "PLA-CF", "PLA Aero", "PETG", "PETG Matte", "PETG-HF", "PETG Translucent", "PETG-CF", "ABS", "TPU", "ASA", "Nylon", "PC", "PVA", "HIPS", "Carbon"];
 
-// --- COULEURS OFFICIELLES BAMBU (Issues de ton fichier Excel, avec Hex améliorés) ---
 const BAMBU_COLORS = [
-    { name: 'Blanc ivoire', ref: '11100', hex: '#F5F5DC' },
-    { name: 'Noir Basic', ref: '10101', hex: '#1A1A1A' },
-    { name: 'Blanc os', ref: '11103', hex: '#E3DAC9' },
-    { name: 'Jaune citron', ref: '11400', hex: '#FFEA00' },
-    { name: 'Mandarine', ref: '11300', hex: '#FF8C00' },
-    { name: 'Rose sakura', ref: '11201', hex: '#FFB7C5' },
-    { name: 'Violet lilas', ref: '11700', hex: '#C8A2C8' },
-    { name: 'Prune', ref: '11204', hex: '#8E4585' },
-    { name: 'Rouge écarlate', ref: '11200', hex: '#FF2400' },
-    { name: 'Rouge foncé', ref: '11202', hex: '#8B0000' },
-    { name: 'Vert pomme', ref: '11502', hex: '#8DB600' },
-    { name: 'Vert herbacé', ref: '11500', hex: '#5CBA35' },
-    { name: 'Vert foncé', ref: '11501', hex: '#006400' },
-    { name: 'Bleu glacier', ref: '11601', hex: '#A5F2F3' },
-    { name: 'Bleu ciel', ref: '11603', hex: '#87CEEB' },
-    { name: 'Bleu marine', ref: '11600', hex: '#000080' },
-    { name: 'Bleu foncé', ref: '11602', hex: '#00008B' },
-    { name: 'Brun clair du désert', ref: '11401', hex: '#D4B895' },
-    { name: 'Marron latte', ref: '11800', hex: '#C5A059' },
-    { name: 'Caramel', ref: '11803', hex: '#C68E17' },
-    { name: 'Terre cuite', ref: '11203', hex: '#E2725B' },
-    { name: 'Marron foncé', ref: '11801', hex: '#5C4033' },
-    { name: 'Chocolat noir', ref: '11802', hex: '#3D1C04' },
-    { name: 'Gris cendré', ref: '11102', hex: '#B2BEB5' },
-    { name: 'Gris nardo', ref: '11104', hex: '#808487' },
-    { name: 'Anthracite', ref: '11101', hex: '#383E42' }
+    { name: 'Blanc ivoire', ref: '11100', hex: '#F5F5DC' }, { name: 'Noir Basic', ref: '10101', hex: '#1A1A1A' },
+    { name: 'Blanc os', ref: '11103', hex: '#E3DAC9' }, { name: 'Jaune citron', ref: '11400', hex: '#FFEA00' },
+    { name: 'Mandarine', ref: '11300', hex: '#FF8C00' }, { name: 'Rose sakura', ref: '11201', hex: '#FFB7C5' },
+    { name: 'Violet lilas', ref: '11700', hex: '#C8A2C8' }, { name: 'Prune', ref: '11204', hex: '#8E4585' },
+    { name: 'Rouge écarlate', ref: '11200', hex: '#FF2400' }, { name: 'Rouge foncé', ref: '11202', hex: '#8B0000' },
+    { name: 'Vert pomme', ref: '11502', hex: '#8DB600' }, { name: 'Vert herbacé', ref: '11500', hex: '#5CBA35' },
+    { name: 'Vert foncé', ref: '11501', hex: '#006400' }, { name: 'Bleu glacier', ref: '11601', hex: '#A5F2F3' },
+    { name: 'Bleu ciel', ref: '11603', hex: '#87CEEB' }, { name: 'Bleu marine', ref: '11600', hex: '#000080' },
+    { name: 'Bleu foncé', ref: '11602', hex: '#00008B' }, { name: 'Brun clair du désert', ref: '11401', hex: '#D4B895' },
+    { name: 'Marron latte', ref: '11800', hex: '#C5A059' }, { name: 'Caramel', ref: '11803', hex: '#C68E17' },
+    { name: 'Terre cuite', ref: '11203', hex: '#E2725B' }, { name: 'Marron foncé', ref: '11801', hex: '#5C4033' },
+    { name: 'Chocolat noir', ref: '11802', hex: '#3D1C04' }, { name: 'Gris cendré', ref: '11102', hex: '#B2BEB5' },
+    { name: 'Gris nardo', ref: '11104', hex: '#808487' }, { name: 'Anthracite', ref: '11101', hex: '#383E42' }
 ];
 
-// --- COULEURS STANDARDS (Pour Sunlu, eSun, etc.) ---
 const STANDARD_COLORS = [
     { name: 'Noir', hex: '#000000' }, { name: 'Blanc', hex: '#FFFFFF' }, { name: 'Gris', hex: '#808080' }, 
     { name: 'Gris Argent', hex: '#C0C0C0' }, { name: 'Rouge', hex: '#FF0000' }, { name: 'Bleu', hex: '#0000FF' }, 
@@ -67,7 +52,10 @@ function ModalSubmitButton({ isEdit }: { isEdit: boolean }) {
   )
 }
 
-export default function SpoolModal({ isOpen, onClose, refreshData, initialData = null, prefillData = null }: any) {
+export default function SpoolModal({ 
+  isOpen, onClose, refreshData, initialData = null, prefillData = null,
+  customBrands = [], customMaterials = [], customColors = [] // <-- NOUVEAUX PROPS
+}: any) {
   const [addQuantity, setAddQuantity] = useState(1)
   const [brandInput, setBrandInput] = useState('')
   const [materialInput, setMaterialInput] = useState('')
@@ -92,11 +80,18 @@ export default function SpoolModal({ isOpen, onClose, refreshData, initialData =
 
   if (!isOpen) return null;
 
+  // --- FUSION DES LISTES NATIVES + PRÉRÉGLAGES UTILISATEUR ---
+  const ALL_BRANDS = Array.from(new Set([...SUGGESTED_BRANDS, ...customBrands]));
+  const ALL_MATERIALS = Array.from(new Set([...SUGGESTED_MATERIALS, ...customMaterials]));
+  
   const getColorList = () => { 
-      if (brandInput.toLowerCase().includes('bambu')) return BAMBU_COLORS; 
-      const isStandardMaterial = ['pla', 'petg', 'abs', 'tpu'].some(m => materialInput.toLowerCase().includes(m));
-      if (isStandardMaterial) return STANDARD_COLORS;
-      return []; 
+      let baseList = [];
+      if (brandInput.toLowerCase().includes('bambu')) baseList = BAMBU_COLORS; 
+      else {
+          const isStandardMaterial = ['pla', 'petg', 'abs', 'tpu'].some(m => materialInput.toLowerCase().includes(m));
+          if (isStandardMaterial) baseList = STANDARD_COLORS;
+      }
+      return [...baseList, ...customColors]; 
   };
 
   return (
@@ -113,8 +108,8 @@ export default function SpoolModal({ isOpen, onClose, refreshData, initialData =
           {initialData && <input type="hidden" name="id" value={initialData.id}/>}
           {!initialData && <input type="hidden" name="quantity" value={addQuantity} />}
           
-          <CustomInput label="Marque" name="brand" value={brandInput} setValue={setBrandInput} list={SUGGESTED_BRANDS} />
-          <div className="grid grid-cols-2 gap-4"><CustomInput label="Matière" name="material" value={materialInput} setValue={setMaterialInput} list={SUGGESTED_MATERIALS}/><div className="relative"><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Poids (g)</label><input type="number" name="initial_weight" value={weightInput} onChange={e=>setWeightInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white" required/></div></div>
+          <CustomInput label="Marque" name="brand" value={brandInput} setValue={setBrandInput} list={ALL_BRANDS} />
+          <div className="grid grid-cols-2 gap-4"><CustomInput label="Matière" name="material" value={materialInput} setValue={setMaterialInput} list={ALL_MATERIALS}/><div className="relative"><label className="block text-[11px] font-medium text-gray-500 mb-1.5 uppercase ml-1">Poids (g)</label><input type="number" name="initial_weight" value={weightInput} onChange={e=>setWeightInput(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 p-4 rounded-xl outline-none font-medium cursor-pointer text-gray-900 dark:text-white" required/></div></div>
           
           <CustomInput label="Couleur" name="color" value={colorInput} setValue={setColorInput} list={getColorList()} onSelect={(i:any)=>{if(i.hex)setColorHex(i.hex)}}/>
           

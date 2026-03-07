@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { createClient } from '../utils/supabase/client'
-import { updateThreshold, revertConsumption, restoreSpool, hideSpool, hardDeleteSpool } from './actions'
+import { updateSettings, revertConsumption, restoreSpool, hideSpool, hardDeleteSpool } from './actions'
 import { Search, Plus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw, Archive, X, Trash2, Database } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useFormStatus } from 'react-dom'
@@ -58,7 +58,6 @@ function HideButton() {
     )
 }
 
-// Bouton de suppression brutale pour le menu super-admin
 function HardDeleteButton() {
     const { pending } = useFormStatus()
     return (
@@ -71,10 +70,21 @@ function HardDeleteButton() {
 export default function Home() {
   const [bobines, setBobines] = useState<any[]>([])
   const [archivedSpools, setArchivedSpools] = useState<any[]>([]) 
-  const [allArchivedSpools, setAllArchivedSpools] = useState<any[]>([]) // TOUTES les archives (même cachées)
+  const [allArchivedSpools, setAllArchivedSpools] = useState<any[]>([])
   const [history, setHistory] = useState<any[]>([])
   const [groupSettings, setGroupSettings] = useState<any[]>([])
   
+  // NOUVEAUX ÉTATS POUR LES PRÉRÉGLAGES
+  const [customBrands, setCustomBrands] = useState<string[]>([])
+  const [customMaterials, setCustomMaterials] = useState<string[]>([])
+  const [customColors, setCustomColors] = useState<{name: string, hex: string}[]>([])
+
+  // ETATS DES INPUTS DE CONFIGURATION
+  const [newBrand, setNewBrand] = useState('')
+  const [newMaterial, setNewMaterial] = useState('')
+  const [newColorName, setNewColorName] = useState('')
+  const [newColorHex, setNewColorHex] = useState('#FF0000')
+
   const [user, setUser] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'stock' | 'history' | 'alerte'>('stock')
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
@@ -86,7 +96,7 @@ export default function Home() {
   const [filterMaterial, setFilterMaterial] = useState('Tous')
   
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [isFullHistoryModalOpen, setIsFullHistoryModalOpen] = useState(false) // Modale super-admin
+  const [isFullHistoryModalOpen, setIsFullHistoryModalOpen] = useState(false)
   const [editingBobine, setEditingBobine] = useState<any>(null)
   const [prefillData, setPrefillData] = useState<any>(null)
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
@@ -105,16 +115,19 @@ export default function Home() {
         if (allSpools) {
             setBobines(allSpools.filter(s => !s.archived))
             setArchivedSpools(allSpools.filter(s => s.archived && !s.is_hidden).sort((a, b) => new Date(b.finished_at || 0).getTime() - new Date(a.finished_at || 0).getTime()))
-            // On sauvegarde l'intégralité des archives (y compris les cachées) pour le bouton super-admin
             setAllArchivedSpools(allSpools.filter(s => s.archived).sort((a, b) => new Date(b.finished_at || 0).getTime() - new Date(a.finished_at || 0).getTime()))
         }
 
         const { data: logs } = await supabase.from('consumption_logs').select(`*, spools (price, weight_initial)`).order('created_at', { ascending: false }).limit(500)
         setHistory(logs || [])
 
+        // RÉCUPÉRATION DES PARAMÈTRES ET PRÉRÉGLAGES
         const { data: settings } = await supabase.from('user_settings').select('*').single()
         if (settings) {
             setLowStockThreshold(settings.low_stock_threshold || 200)
+            setCustomBrands(settings.custom_brands || [])
+            setCustomMaterials(settings.custom_materials || [])
+            setCustomColors(settings.custom_colors || [])
         }
 
         const { data: gSettings } = await supabase.from('group_settings').select('*')
@@ -136,6 +149,14 @@ export default function Home() {
   };
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/login'); }
+
+  // FONCTIONS D'AJOUT DES PRÉRÉGLAGES (UI UNIQUEMENT)
+  const addBrand = () => { if (newBrand && !customBrands.includes(newBrand)) { setCustomBrands([...customBrands, newBrand]); setNewBrand(''); } }
+  const removeBrand = (b: string) => setCustomBrands(customBrands.filter(x => x !== b))
+  const addMaterial = () => { if (newMaterial && !customMaterials.includes(newMaterial)) { setCustomMaterials([...customMaterials, newMaterial]); setNewMaterial(''); } }
+  const removeMaterial = (m: string) => setCustomMaterials(customMaterials.filter(x => x !== m))
+  const addColor = () => { if (newColorName && !customColors.some(c => c.name === newColorName)) { setCustomColors([...customColors, {name: newColorName, hex: newColorHex}]); setNewColorName(''); } }
+  const removeColor = (cName: string) => setCustomColors(customColors.filter(x => x.name !== cName))
 
   const filteredBobines = bobines.filter(b => {
     const matchSearch = b.brand.toLowerCase().includes(search.toLowerCase()) || 
@@ -196,8 +217,8 @@ export default function Home() {
 
   const handleSettingsSubmit = (formData: FormData) => {
     setConfirmModal({
-        isOpen: true, title: 'Sauvegarder les réglages ?', message: 'Ce seuil global s\'appliquera immédiatement.', isDanger: false,
-        action: async () => { await updateThreshold(formData); fetchData(); setConfirmModal(prev => ({ ...prev, isOpen: false })); }
+        isOpen: true, title: 'Sauvegarder les réglages ?', message: 'Ces préréglages et seuils seront appliqués immédiatement.', isDanger: false,
+        action: async () => { await updateSettings(formData); fetchData(); setConfirmModal(prev => ({ ...prev, isOpen: false })); }
     });
   };
 
@@ -307,7 +328,6 @@ export default function Home() {
         ) : activeTab === 'history' ? (
           <div className="max-w-4xl mx-auto space-y-8 animate-fade">
              
-             {/* ZONE : BOBINES TERMINÉES VISIBLES */}
              {archivedSpools.length > 0 && (
                 <div className="bg-white dark:bg-[#1C1C1E] p-8 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-fade">
                     <div className="flex justify-between items-center mb-6">
@@ -403,7 +423,6 @@ export default function Home() {
                  </div>
              </div>
 
-             {/* BOUTON HISTORIQUE COMPLET TOUT EN BAS */}
              <div className="flex justify-center pt-8 pb-4">
                 <button onClick={() => setIsFullHistoryModalOpen(true)} className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-[#1C1C1E] text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white rounded-xl font-bold text-sm transition-all border border-gray-200 dark:border-gray-800 shadow-sm cursor-pointer hover:shadow-md hover:-translate-y-0.5">
                     <Database size={18} />
@@ -413,19 +432,87 @@ export default function Home() {
 
           </div>
         ) : (
-          <div className="max-w-xl mx-auto bg-white dark:bg-[#1C1C1E] p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-fade">
-            <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">Réglages</h2>
-            <form action={handleSettingsSubmit} className="space-y-8">
-              <div className="space-y-6">
-                <div><label className="flex justify-between text-sm font-medium mb-4 text-gray-700 dark:text-gray-300"><span>Poids Faible (Global)</span><span className="font-bold text-blue-500">{lowStockThreshold}g</span></label><input type="range" name="threshold" min="50" max="500" step="10" value={lowStockThreshold} onChange={e=>setLowStockThreshold(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white" /></div>
+          <div className="max-w-2xl mx-auto bg-white dark:bg-[#1C1C1E] p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-fade">
+            <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">Réglages & Préréglages</h2>
+            <form action={handleSettingsSubmit} className="space-y-10">
+              
+              {/* SEUIL */}
+              <div>
+                <label className="flex justify-between text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">
+                    <span>Poids Faible (Alerte globale)</span>
+                    <span className="font-bold text-blue-500">{lowStockThreshold}g</span>
+                </label>
+                <input type="range" name="threshold" min="50" max="500" step="10" value={lowStockThreshold} onChange={e=>setLowStockThreshold(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white" />
               </div>
-              <button type="submit" className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:bg-gray-900 hover:shadow-xl">Sauvegarder</button>
+
+              <hr className="border-gray-100 dark:border-gray-800" />
+
+              {/* MARQUES */}
+              <div>
+                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Marques personnalisées</h3>
+                 <div className="flex gap-2 mb-4">
+                    <input type="text" value={newBrand} onChange={e=>setNewBrand(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addBrand(); }}} placeholder="Ajouter une marque..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
+                    <button type="button" onClick={addBrand} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
+                 </div>
+                 <div className="flex flex-wrap gap-2">
+                    {customBrands.map(b => (
+                        <span key={b} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
+                            {b} <button type="button" onClick={()=>removeBrand(b)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
+                        </span>
+                    ))}
+                 </div>
+              </div>
+
+              {/* MATIERES */}
+              <div>
+                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Matériaux personnalisés</h3>
+                 <div className="flex gap-2 mb-4">
+                    <input type="text" value={newMaterial} onChange={e=>setNewMaterial(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addMaterial(); }}} placeholder="Ajouter un matériau..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
+                    <button type="button" onClick={addMaterial} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
+                 </div>
+                 <div className="flex flex-wrap gap-2">
+                    {customMaterials.map(m => (
+                        <span key={m} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
+                            {m} <button type="button" onClick={()=>removeMaterial(m)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
+                        </span>
+                    ))}
+                 </div>
+              </div>
+
+              {/* COULEURS */}
+              <div>
+                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Couleurs personnalisées</h3>
+                 <div className="flex gap-2 mb-4 items-center">
+                    <div className="flex items-center justify-center w-12 h-[42px] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden shrink-0" style={{backgroundColor: newColorHex}}>
+                        <input type="color" value={newColorHex} onChange={e=>setNewColorHex(e.target.value)} className="opacity-0 absolute inset-0 w-full h-full cursor-pointer" />
+                    </div>
+                    <input type="text" value={newColorName} onChange={e=>setNewColorName(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addColor(); }}} placeholder="Nom de la couleur..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
+                    <button type="button" onClick={addColor} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
+                 </div>
+                 <div className="flex flex-wrap gap-2">
+                    {customColors.map(c => (
+                        <span key={c.name} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
+                            <div className="w-3 h-3 rounded-full shadow-sm border border-gray-200/50" style={{backgroundColor: c.hex}}></div>
+                            {c.name} <button type="button" onClick={()=>removeColor(c.name)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
+                        </span>
+                    ))}
+                 </div>
+              </div>
+
+              {/* HIDDENS */}
+              <input type="hidden" name="custom_brands" value={JSON.stringify(customBrands)} />
+              <input type="hidden" name="custom_materials" value={JSON.stringify(customMaterials)} />
+              <input type="hidden" name="custom_colors" value={JSON.stringify(customColors)} />
+
+              <button type="submit" className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:bg-gray-900 hover:shadow-xl mt-4">
+                  Sauvegarder tous les réglages
+              </button>
             </form>
           </div>
         )}
       </main>
 
-      <SpoolModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} refreshData={fetchData} initialData={editingBobine} prefillData={prefillData} />
+      <SpoolModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} refreshData={fetchData} initialData={editingBobine} prefillData={prefillData} customBrands={customBrands} customMaterials={customMaterials} customColors={customColors} />
       
       <GroupDetailsModal 
         isOpen={!!selectedGroupKey} 
