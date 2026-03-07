@@ -5,7 +5,6 @@ import { revalidatePath } from 'next/cache'
 
 export async function addSpool(formData: FormData) {
   const supabase = await createClient()
-  
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
@@ -51,32 +50,60 @@ export async function deleteSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
   
-  // SOFT DELETE : On archive au lieu de supprimer physiquement
   await supabase
     .from('spools')
-    .update({ archived: true })
+    .update({ 
+      archived: true, 
+      finished_at: new Date().toISOString() 
+    })
     .eq('id', id)
 
   revalidatePath('/')
 }
 
-// --- NOUVELLE FONCTION : RESTAURER UNE BOBINE ---
 export async function restoreSpool(formData: FormData) {
   const supabase = await createClient()
   const id = formData.get('id')
   
-  // On désarchive la bobine pour la remettre dans le stock
   await supabase
     .from('spools')
-    .update({ archived: false })
+    .update({ 
+      archived: false, 
+      finished_at: null 
+    })
     .eq('id', id)
+
+  revalidatePath('/')
+}
+
+export async function hideSpool(formData: FormData) {
+  const supabase = await createClient()
+  const id = formData.get('id')
+  
+  await supabase
+    .from('spools')
+    .update({ is_hidden: true })
+    .eq('id', id)
+
+  revalidatePath('/')
+}
+
+// --- NOUVELLE FONCTION : SUPPRESSION DÉFINITIVE DE LA BDD ---
+export async function hardDeleteSpool(formData: FormData) {
+  const supabase = await createClient()
+  const id = formData.get('id')
+
+  // 1. On supprime d'abord les consommations liées pour éviter les erreurs
+  await supabase.from('consumption_logs').delete().eq('spool_id', id)
+  
+  // 2. On supprime définitivement la bobine
+  await supabase.from('spools').delete().eq('id', id)
 
   revalidatePath('/')
 }
 
 export async function consumeSpool(formData: FormData) {
   const supabase = await createClient()
-  
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
@@ -137,38 +164,23 @@ export async function updateThreshold(formData: FormData) {
 
 export async function revertConsumption(formData: FormData) {
   const supabase = await createClient()
-  
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return
 
   const logId = formData.get('log_id')
 
-  const { data: log } = await supabase
-    .from('consumption_logs')
-    .select('*')
-    .eq('id', logId)
-    .single()
-
+  const { data: log } = await supabase.from('consumption_logs').select('*').eq('id', logId).single()
   if (!log) return
 
   if (log.spool_id) {
-    const { data: spool } = await supabase
-      .from('spools')
-      .select('weight_used')
-      .eq('id', log.spool_id)
-      .single()
-
+    const { data: spool } = await supabase.from('spools').select('weight_used').eq('id', log.spool_id).single()
     if (spool) {
       const newUsed = Math.max(0, spool.weight_used - log.amount)
-      await supabase
-        .from('spools')
-        .update({ weight_used: newUsed })
-        .eq('id', log.spool_id)
+      await supabase.from('spools').update({ weight_used: newUsed }).eq('id', log.spool_id)
     }
   }
 
   await supabase.from('consumption_logs').delete().eq('id', logId)
-  
   revalidatePath('/')
 }
 
