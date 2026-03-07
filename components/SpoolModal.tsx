@@ -7,7 +7,7 @@ import { addSpool, updateSpool } from '../app/actions'
 import { useFormStatus } from 'react-dom'
 
 const SUGGESTED_BRANDS = ["Bambu Lab", "Sunlu", "eSUN", "Prusament", "Creality", "Eryone", "PolyMaker", "Amazon Basics", "Geeetech", "Anycubic", "Overture"];
-const SUGGESTED_MATERIALS = ["PLA", "PLA Basic", "PLA Matte", "PLA Tough+", "PLA Silk+", "PLA Translucent", "PLA Silk Multi-Color", "PLA Wood", "PLA Basic Gradient", "PLA Galaxy", "PLA Metal", "PLA Marble", "PLA Glow", "PLA Sparkle", "PLA-CF", "PLA Aero", "PETG", "PETG-HF", "PETG Translucent", "PETG-CF", "ABS", "TPU", "ASA", "Nylon", "PC", "PVA", "HIPS", "Carbon"];
+const SUGGESTED_MATERIALS = ["PLA", "PLA Basic", "PLA Matte", "PLA Tough+", "PLA Silk+", "PLA Translucent", "PLA Silk Multi-Color", "PLA Wood", "PLA Basic Gradient", "PLA Galaxy", "PLA Metal", "PLA Marble", "PLA Glow", "PLA Sparkle", "PLA-CF", "PLA Aero", "PETG", "PETG Matte", "PETG-HF", "PETG Translucent", "PETG-CF", "ABS", "TPU", "ASA", "Nylon", "PC", "PVA", "HIPS", "Carbon"];
 
 // --- COULEURS OFFICIELLES BAMBU (Issues de ton fichier Excel, avec Hex améliorés) ---
 const BAMBU_COLORS = [
