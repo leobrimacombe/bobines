@@ -85,7 +85,7 @@ export default function SpoolModal({
   const ALL_MATERIALS = Array.from(new Set([...SUGGESTED_MATERIALS, ...customMaterials]));
   
   const getColorList = () => { 
-      let baseList = [];
+      let baseList: any[] = []; // <-- L'ajout de : any[] corrige l'erreur Vercel
       if (brandInput.toLowerCase().includes('bambu')) baseList = BAMBU_COLORS; 
       else {
           const isStandardMaterial = ['pla', 'petg', 'abs', 'tpu'].some(m => materialInput.toLowerCase().includes(m));
