@@ -122,7 +122,6 @@ export async function updateSpool(formData: FormData) {
   revalidatePath('/')
 }
 
-// --- FONCTION DE SAUVEGARDE GLOBALE DES PARAMÈTRES ET PRÉRÉGLAGES ---
 export async function updateSettings(formData: FormData) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -130,17 +129,20 @@ export async function updateSettings(formData: FormData) {
 
   const threshold = parseInt(formData.get('threshold') as string)
   
-  // Récupération des tableaux envoyés depuis l'interface
   const custom_brands = JSON.parse(formData.get('custom_brands') as string || '[]')
   const custom_materials = JSON.parse(formData.get('custom_materials') as string || '[]')
   const custom_colors = JSON.parse(formData.get('custom_colors') as string || '[]')
+  
+  // NOUVEAU : Préréglages par marque
+  const brand_presets = JSON.parse(formData.get('brand_presets') as string || '{}')
 
   await supabase.from('user_settings').upsert({ 
     user_id: user.id, 
     low_stock_threshold: threshold || 200,
     custom_brands,
     custom_materials,
-    custom_colors
+    custom_colors,
+    brand_presets
   }, { onConflict: 'user_id' })
   
   revalidatePath('/')

@@ -13,6 +13,8 @@ import GroupDetailsModal from '../components/GroupDetailsModal'
 import ConfirmModal from '../components/ui/ConfirmModal'
 import { BrandLogo } from '../components/ui/BrandLogo'
 
+const SUGGESTED_BRANDS = ["Bambu Lab", "Sunlu", "eSUN", "Prusament", "Creality", "Eryone", "PolyMaker", "Amazon Basics", "Geeetech", "Anycubic", "Overture"];
+
 const BAMBU_COLORS = [
     { name: 'Blanc ivoire', ref: '11100', hex: '#F5F5DC' }, { name: 'Noir Basic', ref: '10101', hex: '#1A1A1A' },
     { name: 'Blanc os', ref: '11103', hex: '#E3DAC9' }, { name: 'Jaune citron', ref: '11400', hex: '#FFEA00' },
@@ -74,16 +76,22 @@ export default function Home() {
   const [history, setHistory] = useState<any[]>([])
   const [groupSettings, setGroupSettings] = useState<any[]>([])
   
-  // NOUVEAUX ÉTATS POUR LES PRÉRÉGLAGES
+  // ETATS DES PRÉRÉGLAGES GLOBAUX
   const [customBrands, setCustomBrands] = useState<string[]>([])
   const [customMaterials, setCustomMaterials] = useState<string[]>([])
   const [customColors, setCustomColors] = useState<{name: string, hex: string}[]>([])
 
-  // ETATS DES INPUTS DE CONFIGURATION
   const [newBrand, setNewBrand] = useState('')
   const [newMaterial, setNewMaterial] = useState('')
   const [newColorName, setNewColorName] = useState('')
   const [newColorHex, setNewColorHex] = useState('#FF0000')
+
+  // NOUVEAUX ETATS DES PRÉRÉGLAGES PAR MARQUE
+  const [brandPresets, setBrandPresets] = useState<Record<string, {materials: string[], colors: {name:string, hex:string}[]}>>({})
+  const [configBrand, setConfigBrand] = useState('') // Marque sélectionnée dans le menu déroulant
+  const [newBPMaterial, setNewBPMaterial] = useState('')
+  const [newBPColorName, setNewBPColorName] = useState('')
+  const [newBPColorHex, setNewBPColorHex] = useState('#00FF00')
 
   const [user, setUser] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'stock' | 'history' | 'alerte'>('stock')
@@ -121,13 +129,13 @@ export default function Home() {
         const { data: logs } = await supabase.from('consumption_logs').select(`*, spools (price, weight_initial)`).order('created_at', { ascending: false }).limit(500)
         setHistory(logs || [])
 
-        // RÉCUPÉRATION DES PARAMÈTRES ET PRÉRÉGLAGES
         const { data: settings } = await supabase.from('user_settings').select('*').single()
         if (settings) {
             setLowStockThreshold(settings.low_stock_threshold || 200)
             setCustomBrands(settings.custom_brands || [])
             setCustomMaterials(settings.custom_materials || [])
             setCustomColors(settings.custom_colors || [])
+            setBrandPresets(settings.brand_presets || {}) // Charge les presets par marque !
         }
 
         const { data: gSettings } = await supabase.from('group_settings').select('*')
@@ -150,13 +158,48 @@ export default function Home() {
 
   const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/login'); }
 
-  // FONCTIONS D'AJOUT DES PRÉRÉGLAGES (UI UNIQUEMENT)
+  // FONCTIONS D'AJOUT DES PRÉRÉGLAGES (GLOBAUX)
   const addBrand = () => { if (newBrand && !customBrands.includes(newBrand)) { setCustomBrands([...customBrands, newBrand]); setNewBrand(''); } }
   const removeBrand = (b: string) => setCustomBrands(customBrands.filter(x => x !== b))
   const addMaterial = () => { if (newMaterial && !customMaterials.includes(newMaterial)) { setCustomMaterials([...customMaterials, newMaterial]); setNewMaterial(''); } }
   const removeMaterial = (m: string) => setCustomMaterials(customMaterials.filter(x => x !== m))
   const addColor = () => { if (newColorName && !customColors.some(c => c.name === newColorName)) { setCustomColors([...customColors, {name: newColorName, hex: newColorHex}]); setNewColorName(''); } }
   const removeColor = (cName: string) => setCustomColors(customColors.filter(x => x.name !== cName))
+
+  // FONCTIONS D'AJOUT DES PRÉRÉGLAGES (PAR MARQUE)
+  const addBPMaterial = () => {
+      if (!newBPMaterial || !configBrand) return;
+      setBrandPresets(prev => {
+          const brandData = prev[configBrand] || { materials: [], colors: [] };
+          if (brandData.materials.includes(newBPMaterial)) return prev;
+          return { ...prev, [configBrand]: { ...brandData, materials: [...brandData.materials, newBPMaterial] } };
+      });
+      setNewBPMaterial('');
+  }
+
+  const removeBPMaterial = (m: string) => {
+      setBrandPresets(prev => {
+          const brandData = prev[configBrand];
+          return { ...prev, [configBrand]: { ...brandData, materials: brandData.materials.filter(x => x !== m) } };
+      });
+  }
+
+  const addBPColor = () => {
+      if (!newBPColorName || !configBrand) return;
+      setBrandPresets(prev => {
+          const brandData = prev[configBrand] || { materials: [], colors: [] };
+          if (brandData.colors.some(c => c.name === newBPColorName)) return prev;
+          return { ...prev, [configBrand]: { ...brandData, colors: [...brandData.colors, {name: newBPColorName, hex: newBPColorHex}] } };
+      });
+      setNewBPColorName('');
+  }
+
+  const removeBPColor = (cName: string) => {
+      setBrandPresets(prev => {
+          const brandData = prev[configBrand];
+          return { ...prev, [configBrand]: { ...brandData, colors: brandData.colors.filter(x => x.name !== cName) } };
+      });
+  }
 
   const filteredBobines = bobines.filter(b => {
     const matchSearch = b.brand.toLowerCase().includes(search.toLowerCase()) || 
@@ -432,87 +475,153 @@ export default function Home() {
 
           </div>
         ) : (
-          <div className="max-w-2xl mx-auto bg-white dark:bg-[#1C1C1E] p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800 animate-fade">
-            <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">Réglages & Préréglages</h2>
-            <form action={handleSettingsSubmit} className="space-y-10">
-              
-              {/* SEUIL */}
-              <div>
-                <label className="flex justify-between text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">
-                    <span>Poids Faible (Alerte globale)</span>
-                    <span className="font-bold text-blue-500">{lowStockThreshold}g</span>
-                </label>
-                <input type="range" name="threshold" min="50" max="500" step="10" value={lowStockThreshold} onChange={e=>setLowStockThreshold(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white" />
-              </div>
+          <div className="max-w-2xl mx-auto space-y-8 animate-fade">
+            
+            {/* BLOC 1 : GLOBALES */}
+            <div className="bg-white dark:bg-[#1C1C1E] p-8 md:p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800">
+                <h2 className="text-2xl font-bold mb-8 text-gray-900 dark:text-white">Réglages Généraux</h2>
+                <form action={handleSettingsSubmit} className="space-y-10">
+                
+                <div>
+                    <label className="flex justify-between text-sm font-medium mb-4 text-gray-700 dark:text-gray-300">
+                        <span>Poids Faible (Alerte globale)</span>
+                        <span className="font-bold text-blue-500">{lowStockThreshold}g</span>
+                    </label>
+                    <input type="range" name="threshold" min="50" max="500" step="10" value={lowStockThreshold} onChange={e=>setLowStockThreshold(parseInt(e.target.value))} className="w-full h-2 bg-gray-200 dark:bg-gray-700 rounded-lg appearance-none cursor-pointer accent-black dark:accent-white" />
+                </div>
 
-              <hr className="border-gray-100 dark:border-gray-800" />
+                <hr className="border-gray-100 dark:border-gray-800" />
 
-              {/* MARQUES */}
-              <div>
-                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Marques personnalisées</h3>
-                 <div className="flex gap-2 mb-4">
-                    <input type="text" value={newBrand} onChange={e=>setNewBrand(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addBrand(); }}} placeholder="Ajouter une marque..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
-                    <button type="button" onClick={addBrand} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
-                 </div>
-                 <div className="flex flex-wrap gap-2">
-                    {customBrands.map(b => (
-                        <span key={b} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
-                            {b} <button type="button" onClick={()=>removeBrand(b)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
-                        </span>
-                    ))}
-                 </div>
-              </div>
-
-              {/* MATIERES */}
-              <div>
-                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Matériaux personnalisés</h3>
-                 <div className="flex gap-2 mb-4">
-                    <input type="text" value={newMaterial} onChange={e=>setNewMaterial(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addMaterial(); }}} placeholder="Ajouter un matériau..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
-                    <button type="button" onClick={addMaterial} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
-                 </div>
-                 <div className="flex flex-wrap gap-2">
-                    {customMaterials.map(m => (
-                        <span key={m} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
-                            {m} <button type="button" onClick={()=>removeMaterial(m)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
-                        </span>
-                    ))}
-                 </div>
-              </div>
-
-              {/* COULEURS */}
-              <div>
-                 <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Couleurs personnalisées</h3>
-                 <div className="flex gap-2 mb-4 items-center">
-                    <div className="flex items-center justify-center w-12 h-[42px] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden shrink-0" style={{backgroundColor: newColorHex}}>
-                        <input type="color" value={newColorHex} onChange={e=>setNewColorHex(e.target.value)} className="opacity-0 absolute inset-0 w-full h-full cursor-pointer" />
+                <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Marques personnalisées</h3>
+                    <div className="flex gap-2 mb-4">
+                        <input type="text" value={newBrand} onChange={e=>setNewBrand(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addBrand(); }}} placeholder="Ajouter une marque..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
+                        <button type="button" onClick={addBrand} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
                     </div>
-                    <input type="text" value={newColorName} onChange={e=>setNewColorName(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addColor(); }}} placeholder="Nom de la couleur..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
-                    <button type="button" onClick={addColor} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
-                 </div>
-                 <div className="flex flex-wrap gap-2">
-                    {customColors.map(c => (
-                        <span key={c.name} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
-                            <div className="w-3 h-3 rounded-full shadow-sm border border-gray-200/50" style={{backgroundColor: c.hex}}></div>
-                            {c.name} <button type="button" onClick={()=>removeColor(c.name)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
-                        </span>
-                    ))}
-                 </div>
-              </div>
+                    <div className="flex flex-wrap gap-2">
+                        {customBrands.map(b => (
+                            <span key={b} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
+                                {b} <button type="button" onClick={()=>removeBrand(b)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
 
-              {/* HIDDENS */}
-              <input type="hidden" name="custom_brands" value={JSON.stringify(customBrands)} />
-              <input type="hidden" name="custom_materials" value={JSON.stringify(customMaterials)} />
-              <input type="hidden" name="custom_colors" value={JSON.stringify(customColors)} />
+                <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Matériaux (Toutes marques)</h3>
+                    <div className="flex gap-2 mb-4">
+                        <input type="text" value={newMaterial} onChange={e=>setNewMaterial(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addMaterial(); }}} placeholder="Ajouter un matériau..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
+                        <button type="button" onClick={addMaterial} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {customMaterials.map(m => (
+                            <span key={m} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
+                                {m} <button type="button" onClick={()=>removeMaterial(m)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
 
-              <button type="submit" className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:bg-gray-900 hover:shadow-xl mt-4">
-                  Sauvegarder tous les réglages
-              </button>
-            </form>
+                <div>
+                    <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-4 uppercase tracking-wider">Couleurs (Toutes marques)</h3>
+                    <div className="flex gap-2 mb-4 items-center">
+                        <div className="flex items-center justify-center w-12 h-[42px] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden shrink-0" style={{backgroundColor: newColorHex}}>
+                            <input type="color" value={newColorHex} onChange={e=>setNewColorHex(e.target.value)} className="opacity-0 absolute inset-0 w-full h-full cursor-pointer" />
+                        </div>
+                        <input type="text" value={newColorName} onChange={e=>setNewColorName(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addColor(); }}} placeholder="Nom de la couleur..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
+                        <button type="button" onClick={addColor} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {customColors.map(c => (
+                            <span key={c.name} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
+                                <div className="w-3 h-3 rounded-full shadow-sm border border-gray-200/50" style={{backgroundColor: c.hex}}></div>
+                                {c.name} <button type="button" onClick={()=>removeColor(c.name)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
+                            </span>
+                        ))}
+                    </div>
+                </div>
+
+                {/* HIDDENS GENERAUX */}
+                <input type="hidden" name="custom_brands" value={JSON.stringify(customBrands)} />
+                <input type="hidden" name="custom_materials" value={JSON.stringify(customMaterials)} />
+                <input type="hidden" name="custom_colors" value={JSON.stringify(customColors)} />
+                
+                {/* HIDDEN BRAND PRESETS */}
+                <input type="hidden" name="brand_presets" value={JSON.stringify(brandPresets)} />
+
+                <button type="submit" className="w-full bg-black dark:bg-white text-white dark:text-black py-4 rounded-xl font-bold shadow-lg cursor-pointer active:scale-95 transition-all hover:bg-gray-900 hover:shadow-xl mt-4">
+                    Sauvegarder la configuration
+                </button>
+                </form>
+            </div>
+
+            {/* BLOC 2 : PAR MARQUE */}
+            <div className="bg-white dark:bg-[#1C1C1E] p-8 md:p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800">
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">Préréglages par Marque</h2>
+                <p className="text-sm text-gray-500 mb-8 font-medium">Ces matériaux et couleurs n'apparaîtront que lorsque vous sélectionnerez cette marque.</p>
+                
+                <div className="space-y-6">
+                    <div>
+                        <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">1. Choisir la marque à configurer</label>
+                        <select value={configBrand} onChange={e=>setConfigBrand(e.target.value)} className="w-full bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white cursor-pointer">
+                            <option value="">-- Sélectionner une marque --</option>
+                            {Array.from(new Set([...SUGGESTED_BRANDS, ...customBrands, ...Object.keys(brandPresets)])).sort().map(b => (
+                                <option key={b} value={b}>{b}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {configBrand && (
+                        <div className="space-y-8 animate-fade pt-4 border-t border-gray-100 dark:border-gray-800">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Matériaux spécifiques pour {configBrand}</label>
+                                <div className="flex gap-2 mb-3">
+                                   <input type="text" value={newBPMaterial} onChange={e=>setNewBPMaterial(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addBPMaterial(); }}} placeholder="Ex: PLA Silk Dual..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
+                                   <button type="button" onClick={addBPMaterial} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                   {(brandPresets[configBrand]?.materials || []).map(m => (
+                                       <span key={m} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
+                                           {m} <button type="button" onClick={()=>removeBPMaterial(m)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
+                                       </span>
+                                   ))}
+                                   {(brandPresets[configBrand]?.materials || []).length === 0 && <p className="text-sm text-gray-400 italic mt-2">Aucun matériau spécifique</p>}
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-bold text-gray-500 mb-2 uppercase">Couleurs spécifiques pour {configBrand}</label>
+                                <div className="flex gap-2 mb-3 items-center">
+                                   <div className="flex items-center justify-center w-12 h-[42px] rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm relative overflow-hidden shrink-0" style={{backgroundColor: newBPColorHex}}>
+                                       <input type="color" value={newBPColorHex} onChange={e=>setNewBPColorHex(e.target.value)} className="opacity-0 absolute inset-0 w-full h-full cursor-pointer" />
+                                   </div>
+                                   <input type="text" value={newBPColorName} onChange={e=>setNewBPColorName(e.target.value)} onKeyDown={e => { if(e.key === 'Enter') { e.preventDefault(); addBPColor(); }}} placeholder="Ex: Vert Fluorescent..." className="flex-1 bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500/20 dark:text-white" />
+                                   <button type="button" onClick={addBPColor} className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white px-4 py-2.5 rounded-xl font-bold text-sm transition-colors cursor-pointer"><Plus size={16}/></button>
+                                </div>
+                                <div className="flex flex-wrap gap-2">
+                                   {(brandPresets[configBrand]?.colors || []).map(c => (
+                                       <span key={c.name} className="bg-gray-50 dark:bg-[#2C2C2E] border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 text-sm px-3 py-1.5 rounded-xl flex items-center gap-2 font-medium">
+                                           <div className="w-3 h-3 rounded-full shadow-sm border border-gray-200/50" style={{backgroundColor: c.hex}}></div>
+                                           {c.name} <button type="button" onClick={()=>removeBPColor(c.name)} className="text-gray-400 hover:text-red-500 cursor-pointer"><X size={14}/></button>
+                                       </span>
+                                   ))}
+                                   {(brandPresets[configBrand]?.colors || []).length === 0 && <p className="text-sm text-gray-400 italic mt-2">Aucune couleur spécifique</p>}
+                                </div>
+                            </div>
+
+                            <div className="bg-blue-50/50 dark:bg-blue-900/10 p-4 rounded-xl border border-blue-100 dark:border-blue-900/30 text-blue-600 dark:text-blue-400 text-sm font-medium flex items-center gap-2">
+                                <AlertTriangle size={16} /> N'oubliez pas de cliquer sur "Sauvegarder la configuration" au-dessus pour valider !
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </div>
+
           </div>
         )}
       </main>
 
-      <SpoolModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} refreshData={fetchData} initialData={editingBobine} prefillData={prefillData} customBrands={customBrands} customMaterials={customMaterials} customColors={customColors} />
+      <SpoolModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} refreshData={fetchData} initialData={editingBobine} prefillData={prefillData} customBrands={customBrands} customMaterials={customMaterials} customColors={customColors} brandPresets={brandPresets} />
       
       <GroupDetailsModal 
         isOpen={!!selectedGroupKey} 

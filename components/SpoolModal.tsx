@@ -54,7 +54,7 @@ function ModalSubmitButton({ isEdit }: { isEdit: boolean }) {
 
 export default function SpoolModal({ 
   isOpen, onClose, refreshData, initialData = null, prefillData = null,
-  customBrands = [], customMaterials = [], customColors = [] // <-- NOUVEAUX PROPS
+  customBrands = [], customMaterials = [], customColors = [], brandPresets = {} // <-- ON REÇOIT LES PRESETS ICI
 }: any) {
   const [addQuantity, setAddQuantity] = useState(1)
   const [brandInput, setBrandInput] = useState('')
@@ -80,18 +80,25 @@ export default function SpoolModal({
 
   if (!isOpen) return null;
 
-  // --- FUSION DES LISTES NATIVES + PRÉRÉGLAGES UTILISATEUR ---
+  // --- RECHERCHE DES PRESETS DE LA MARQUE ---
+  // On cherche si la marque tapée correspond à un preset (insensible à la casse)
+  const currentBrandKey = Object.keys(brandPresets).find(k => k.toLowerCase() === brandInput.trim().toLowerCase());
+  const currentBrandPresets = currentBrandKey ? brandPresets[currentBrandKey] : { materials: [], colors: [] };
+
+  // FUSION : SUGGESTIONS NATIVES + GLOBALES + SPECIFIQUES A LA MARQUE
   const ALL_BRANDS = Array.from(new Set([...SUGGESTED_BRANDS, ...customBrands]));
-  const ALL_MATERIALS = Array.from(new Set([...SUGGESTED_MATERIALS, ...customMaterials]));
+  const ALL_MATERIALS = Array.from(new Set([...SUGGESTED_MATERIALS, ...customMaterials, ...(currentBrandPresets.materials || [])]));
   
   const getColorList = () => { 
-      let baseList: any[] = []; // <-- L'ajout de : any[] corrige l'erreur Vercel
+      let baseList: any[] = [];
       if (brandInput.toLowerCase().includes('bambu')) baseList = BAMBU_COLORS; 
       else {
           const isStandardMaterial = ['pla', 'petg', 'abs', 'tpu'].some(m => materialInput.toLowerCase().includes(m));
           if (isStandardMaterial) baseList = STANDARD_COLORS;
       }
-      return [...baseList, ...customColors]; 
+      
+      // On ajoute les couleurs globales + les couleurs de la marque spécifique
+      return [...baseList, ...customColors, ...(currentBrandPresets.colors || [])]; 
   };
 
   return (
