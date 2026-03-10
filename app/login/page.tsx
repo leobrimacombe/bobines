@@ -7,6 +7,7 @@ import { User, Lock, Mail, Disc3, ArrowRight, Loader2, AlertCircle } from 'lucid
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
+import { Turnstile } from '@marsidev/react-turnstile'
 
 // --- COMPOSANT BOUTON AVEC CHARGEMENT ---
 function SubmitButton({ 
@@ -107,7 +108,7 @@ function LoginContent() {
 
         {/* --- FORMULAIRE AVEC TRANSITION --- */}
         <div className="p-10 pt-0 overflow-hidden">
-          <div className="relative w-full transition-all duration-500 ease-in-out" style={{ height: isLoginMode ? '280px' : '360px' }}>
+          <div className="relative w-full transition-all duration-500 ease-in-out" style={{ height: isLoginMode ? '280px' : '440px' }}>
             
             {/* Formulaire Connexion */}
             <div className={`absolute top-0 left-0 w-full transition-all duration-500 ease-in-out ${isLoginMode ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-full pointer-events-none'}`}>
@@ -190,7 +191,13 @@ function LoginContent() {
                     />
                   </div>
                 </div>
-                <div className="pt-4">
+                <div className="pt-2">
+                  <Turnstile
+                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                    options={{ theme: 'auto', size: 'flexible' }}
+                  />
+                </div>
+                <div className="pt-3">
                   <SubmitButton action={signup} loadingText="Création...">
                     Créer mon compte
                   </SubmitButton>

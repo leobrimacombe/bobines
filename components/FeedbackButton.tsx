@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { MessageSquare, X, Send, Loader2, CheckCircle, Star } from 'lucide-react'
+import { Turnstile } from '@marsidev/react-turnstile'
 import { submitFeedback } from '../app/feedback/action'
 
 const STARS = [1, 2, 3, 4, 5]
@@ -12,11 +13,12 @@ export default function FeedbackButton() {
   const [rating, setRating] = useState<number | null>(null)
   const [hover, setHover] = useState<number | null>(null)
   const [status, setStatus] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null)
 
   async function handleSubmit() {
-    if (!message.trim()) return
+    if (!message.trim() || !turnstileToken) return
     setStatus('loading')
-    await submitFeedback(message, rating)
+    await submitFeedback(message, rating, turnstileToken)
     setStatus('done')
     setTimeout(() => {
       setOpen(false)
@@ -90,10 +92,19 @@ export default function FeedbackButton() {
                   className="w-full text-sm bg-gray-50 dark:bg-[#2c2c2e] border border-gray-200 dark:border-gray-700 rounded-xl p-3 outline-none focus:ring-2 focus:ring-blue-500/30 resize-none text-gray-900 dark:text-white placeholder:text-gray-400 transition-all"
                 />
 
+                {/* Captcha */}
+                <div className="mt-3">
+                  <Turnstile
+                    siteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+                    onSuccess={setTurnstileToken}
+                    options={{ theme: 'auto', size: 'flexible' }}
+                  />
+                </div>
+
                 {/* Bouton envoyer */}
                 <button
                   onClick={handleSubmit}
-                  disabled={!message.trim() || status === 'loading'}
+                  disabled={!message.trim() || !turnstileToken || status === 'loading'}
                   className="mt-3 w-full flex items-center justify-center gap-2 bg-blue-500 hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed text-white text-sm font-semibold py-2.5 rounded-xl transition-colors cursor-pointer"
                 >
                   {status === 'loading' ? (

@@ -2,10 +2,13 @@
 
 import { createClient } from '../../utils/supabase/server'
 import { Resend } from 'resend'
+import { verifyTurnstile } from '../../utils/turnstile'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
-export async function submitFeedback(message: string, rating: number | null) {
+export async function submitFeedback(message: string, rating: number | null, turnstileToken: string) {
+  const valid = await verifyTurnstile(turnstileToken)
+  if (!valid) throw new Error('Vérification anti-robot échouée')
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 

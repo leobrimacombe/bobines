@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/utils/supabase/server'
+import { verifyTurnstile } from '@/utils/turnstile'
 
 export async function login(formData: FormData) {
   const supabase = await createClient()
@@ -36,6 +37,10 @@ export async function login(formData: FormData) {
 }
 
 export async function signup(formData: FormData) {
+  const token = formData.get('cf-turnstile-response') as string
+  const valid = await verifyTurnstile(token)
+  if (!valid) redirect('/login?message=Vérification anti-robot échouée')
+
   const supabase = await createClient()
 
   const email = formData.get('email') as string
