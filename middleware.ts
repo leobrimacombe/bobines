@@ -40,11 +40,24 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // SI PAS DE USER et qu'on n'est pas déjà sur /login -> Direction /login
-  if (!user && !request.nextUrl.pathname.startsWith('/login')) {
-    return NextResponse.redirect(new URL('/login', request.url))
+  // --- LE NOUVEAU CODE ---
+  const isPublicRoute = request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/login');
+
+  // 1. Si NON connecté et essaie d'aller sur une page privée (ex: /dashboard) -> Go /login
+  if (!user && !isPublicRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/login'
+    return NextResponse.redirect(url)
   }
 
+  // 2. Si DÉJÀ connecté et essaie d'aller sur l'accueil ou le login -> Go /dashboard
+  if (user && isPublicRoute) {
+    const url = request.nextUrl.clone()
+    url.pathname = '/dashboard'
+    return NextResponse.redirect(url)
+  }
+
+  // Très important : on retourne la réponse pour valider les cookies
   return response
 }
 

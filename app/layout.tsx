@@ -5,8 +5,11 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "Stock Filaments",
-  description: "Gestion de stock simplifiée",
+  title: "SpoolTracker",
+  description: "Gérez votre stock de filaments 3D.",
+  verification: {
+    google: 'Z6b3mENNU_iAX1LacUW_TH-xRsrZiOx4cZ4bKMX6jzc',
+  },
 };
 
 export default function RootLayout({

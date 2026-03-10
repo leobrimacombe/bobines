@@ -5,6 +5,8 @@ import { login, signup } from './actions'
 import { useFormStatus } from 'react-dom'
 import { User, Lock, Mail, Disc3, ArrowRight, Loader2, AlertCircle } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 
 // --- COMPOSANT BOUTON AVEC CHARGEMENT ---
 function SubmitButton({ 
@@ -41,22 +43,28 @@ function SubmitButton({
 
 // --- LE CONTENU DE LA PAGE (QUI UTILISE LES PARAMS) ---
 function LoginContent() {
-  const [isLoginMode, setIsLoginMode] = useState(true)
   const searchParams = useSearchParams()
   const errorMessage = searchParams.get('message')
+  const [isLoginMode, setIsLoginMode] = useState(searchParams.get('tab') !== 'signup')
 
   return (
-    <>
+    <div className="flex flex-col items-stretch w-full max-w-[440px]">
+      {/* Bouton retour au-dessus de la card */}
+      <div className="mb-4 animate-fade">
+        <Link href="/" className="inline-flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-900 dark:hover:text-white transition-colors">
+          <ArrowLeft size={15} /> Retour à l&apos;accueil
+        </Link>
+      </div>
+
       {/* Conteneur principal style Apple Card */}
-      <div className="bg-white dark:bg-[#1C1C1E] w-full max-w-[440px] rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-none border border-gray-100 dark:border-gray-800 overflow-hidden relative z-10 animate-fade">
-        
+      <div className="bg-white dark:bg-[#1C1C1E] w-full rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.1)] dark:shadow-none border border-gray-100 dark:border-gray-800 overflow-hidden relative z-10 animate-fade">
         {/* --- HEADER --- */}
         <div className="pt-12 pb-8 text-center px-10">
           <div className="inline-flex items-center justify-center bg-black dark:bg-white p-4 rounded-[1.25rem] mb-6 shadow-lg shadow-black/10 dark:shadow-white/5">
             <Disc3 size={32} className="text-white dark:text-black animate-[spin_8s_linear_infinite]" />
           </div>
           <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-white mb-2">
-            Stock Filaments
+            SpoolTracker
           </h1>
           <p className="text-gray-500 dark:text-gray-400 text-sm font-medium">
             {isLoginMode ? 'Connectez-vous à votre inventaire' : 'Créez votre compte de gestion'}
@@ -192,7 +200,7 @@ function LoginContent() {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 

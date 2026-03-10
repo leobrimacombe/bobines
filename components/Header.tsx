@@ -8,7 +8,7 @@ export default function Header({ activeTab, setActiveTab, theme, toggleTheme, ha
             <div className="bg-black dark:bg-white text-white dark:text-black p-2 rounded-xl shadow-lg hover:rotate-3 transition-transform duration-300">
               <Disc3 size={24} className="animate-[spin_12s_linear_infinite]" />
             </div>
-            <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">Stock Filaments</h1>
+            <h1 className="text-lg font-semibold tracking-tight text-gray-900 dark:text-white">SpoolTracker</h1>
           </div>
 
           <nav className="bg-gray-200/50 dark:bg-gray-800/50 p-1.5 rounded-2xl flex items-center relative w-full sm:w-[340px]">
