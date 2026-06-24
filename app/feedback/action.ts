@@ -24,7 +24,7 @@ export async function submitFeedback(message: string, rating: number | null, tur
   await resend.emails.send({
     from: 'SpoolTracker <onboarding@resend.dev>',
     to: process.env.FEEDBACK_EMAIL!,
-    subject: `💬 Nouveau feedback SpoolTracker${rating ? ` — ${rating}/5 ⭐` : ''}`,
+    subject: `💬 Nouveau feedback SpoolTracker${rating ? ` (${rating}/5 ⭐)` : ''}`,
     html: `
       <div style="font-family:sans-serif;max-width:480px;margin:auto">
         <h2 style="margin-bottom:4px">Nouveau feedback</h2>

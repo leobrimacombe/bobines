@@ -19,7 +19,7 @@ export async function login(formData: FormData) {
     .single()
 
   if (searchError || !profile) {
-    redirect('/error?message=Utilisateur introuvable')
+    redirect('/login?message=Utilisateur introuvable')
   }
 
   // 2. Maintenant qu'on a l'email, on connecte normalement
@@ -29,7 +29,7 @@ export async function login(formData: FormData) {
   })
 
   if (error) {
-    redirect(`/error?message=${encodeURIComponent(error.message)}`)
+    redirect(`/login?message=${encodeURIComponent(error.message)}`)
   }
 
   revalidatePath('/', 'layout')
@@ -39,7 +39,7 @@ export async function login(formData: FormData) {
 export async function signup(formData: FormData) {
   const token = formData.get('cf-turnstile-response') as string
   const valid = await verifyTurnstile(token)
-  if (!valid) redirect('/login?message=Vérification anti-robot échouée')
+  if (!valid) redirect('/login?tab=signup&message=Vérification anti-robot échouée')
 
   const supabase = await createClient()
 
@@ -55,7 +55,7 @@ export async function signup(formData: FormData) {
     .single()
 
   if (existingUser) {
-    redirect('/error?message=Ce pseudo est déjà pris !')
+    redirect('/login?tab=signup&message=Ce pseudo est déjà pris !')
   }
 
   // 2. On crée le compte Auth (Utilisateur système)
@@ -65,7 +65,7 @@ export async function signup(formData: FormData) {
   })
 
   if (authError) {
-    redirect(`/error?message=${encodeURIComponent(authError.message)}`)
+    redirect(`/login?tab=signup&message=${encodeURIComponent(authError.message)}`)
   }
 
   if (authData.user) {
