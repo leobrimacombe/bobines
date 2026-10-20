@@ -1,10 +1,8 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
-import { createClient } from '../../utils/supabase/client'
-import { updateSettings, revertConsumption, restoreSpool, hideSpool, hardDeleteSpool } from '../actions'
-import { Search, Plus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw, Archive, X, Trash2, Database } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { getDashboardData, updateSettings, revertConsumption, restoreSpool, hideSpool, hardDeleteSpool, exportData, importData } from '../actions'
+import { Search, Plus, AlertTriangle, History, Calendar, Loader2, TrendingUp, Wallet, RotateCcw, Archive, X, Trash2, Database, Download, Upload } from 'lucide-react'
 import { useFormStatus } from 'react-dom'
 import FilamentCharts from '../../components/FilamentCharts'
 import Header from '../../components/Header'
@@ -91,7 +89,6 @@ export default function Dashboard() {
   const [newBPColorName, setNewBPColorName] = useState('')
   const [newBPColorHex, setNewBPColorHex] = useState('#00FF00')
 
-  const [user, setUser] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'stock' | 'history' | 'alerte'>('stock')
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [isLoading, setIsLoading] = useState(true);
@@ -108,26 +105,18 @@ export default function Dashboard() {
   const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
   const [confirmModal, setConfirmModal] = useState({ isOpen: false, title: '', message: '', action: () => {}, isDanger: false })
 
-  const supabase = createClient()
-  const router = useRouter()
+  const importInputRef = useRef<HTMLInputElement>(null)
 
   const fetchData = useCallback(async () => {
     try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) { router.push('/login'); return; }
-        setUser(user)
+        const { spools: allSpools, logs, settings, groupSettings: gSettings } = await getDashboardData()
 
-        const { data: allSpools } = await supabase.from('spools').select('*').order('spool_number', { ascending: true })
-        if (allSpools) {
-            setBobines(allSpools.filter(s => !s.archived))
-            setArchivedSpools(allSpools.filter(s => s.archived && !s.is_hidden).sort((a, b) => new Date(b.finished_at || 0).getTime() - new Date(a.finished_at || 0).getTime()))
-            setAllArchivedSpools(allSpools.filter(s => s.archived).sort((a, b) => new Date(b.finished_at || 0).getTime() - new Date(a.finished_at || 0).getTime()))
-        }
+        setBobines(allSpools.filter(s => !s.archived))
+        setArchivedSpools(allSpools.filter(s => s.archived && !s.is_hidden).sort((a, b) => new Date(b.finished_at || 0).getTime() - new Date(a.finished_at || 0).getTime()))
+        setAllArchivedSpools(allSpools.filter(s => s.archived).sort((a, b) => new Date(b.finished_at || 0).getTime() - new Date(a.finished_at || 0).getTime()))
 
-        const { data: logs } = await supabase.from('consumption_logs').select(`*, spools (price, weight_initial)`).order('created_at', { ascending: false }).limit(500)
-        setHistory(logs || [])
+        setHistory(logs)
 
-        const { data: settings } = await supabase.from('user_settings').select('*').single()
         if (settings) {
             setLowStockThreshold(settings.low_stock_threshold || 200)
             setCustomBrands(settings.custom_brands || [])
@@ -136,11 +125,10 @@ export default function Dashboard() {
             setBrandPresets(settings.brand_presets || {})
         }
 
-        const { data: gSettings } = await supabase.from('group_settings').select('*')
-        setGroupSettings(gSettings || [])
+        setGroupSettings(gSettings)
 
     } catch (e) { console.error(e) } finally { setIsLoading(false) }
-  }, [router, supabase])
+  }, [])
 
   useEffect(() => { 
     fetchData() 
@@ -154,7 +142,32 @@ export default function Dashboard() {
       if (newTheme === 'dark') document.documentElement.classList.add('dark'); else document.documentElement.classList.remove('dark');
   };
 
-  const handleSignOut = async () => { await supabase.auth.signOut(); router.push('/'); }
+  const handleExport = async () => {
+      const json = await exportData()
+      const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }))
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `spooltracker-sauvegarde-${new Date().toISOString().split('T')[0]}.json`
+      a.click()
+      URL.revokeObjectURL(url)
+  }
+
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+      e.target.value = ''
+      if (!file) return
+      const json = await file.text()
+      setConfirmModal({
+          isOpen: true, title: 'Importer ce fichier ?', message: 'Toutes les bobines et l\'historique actuels seront remplacés par ceux du fichier.', isDanger: true,
+          action: async () => {
+              const res = await importData(json)
+              setConfirmModal(prev => ({ ...prev, isOpen: false }))
+              if (!res.ok) { window.alert(`Import impossible : ${res.error}`); return; }
+              window.alert(`${res.count} bobines importées.`)
+              fetchData()
+          }
+      });
+  }
 
   const addBrand = () => { if (newBrand && !customBrands.includes(newBrand)) { setCustomBrands([...customBrands, newBrand]); setNewBrand(''); } }
   const removeBrand = (b: string) => setCustomBrands(customBrands.filter(x => x !== b))
@@ -264,11 +277,10 @@ export default function Dashboard() {
   const openAddModal = (groupData: any = null) => { setEditingBobine(null); setPrefillData(groupData); setIsModalOpen(true); }
 
   if (isLoading) return (<div className="min-h-screen bg-[#F5F5F7] dark:bg-black flex items-center justify-center"><Loader2 className="w-10 h-10 text-blue-500 animate-spin" /></div>);
-  if (!user) return <div className="bg-[#F5F5F7] dark:bg-black min-h-screen"></div>
 
   return (
     <div className="min-h-screen bg-[#F5F5F7] dark:bg-black text-[#1D1D1F] dark:text-[#F5F5F7] font-sans pb-20 transition-colors duration-300">
-      <Header activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} handleSignOut={handleSignOut} />
+      <Header activeTab={activeTab} setActiveTab={setActiveTab} theme={theme} toggleTheme={toggleTheme} />
 
       <main className="max-w-7xl mx-auto p-4 sm:p-8 space-y-8 animate-fade">
         {activeTab === 'stock' ? (
@@ -608,6 +620,20 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            <div className="bg-white dark:bg-[#1C1C1E] p-8 md:p-10 rounded-3xl shadow-xl border border-gray-100 dark:border-gray-800">
+                <h2 className="text-2xl font-bold mb-2 text-gray-900 dark:text-white">Sauvegarde des données</h2>
+                <p className="text-sm text-gray-500 mb-8 font-medium">Exportez toutes vos bobines et votre historique dans un fichier, ou restaurez un fichier exporté (y compris l'export de l'ancienne version en ligne).</p>
+                <div className="flex flex-col sm:flex-row gap-3">
+                    <button type="button" onClick={handleExport} className="flex-1 flex items-center justify-center gap-2 bg-black dark:bg-white text-white dark:text-black py-3.5 rounded-xl font-bold text-sm shadow-lg cursor-pointer active:scale-95 transition-all hover:bg-gray-900 hover:shadow-xl">
+                        <Download size={18} /> Exporter
+                    </button>
+                    <button type="button" onClick={() => importInputRef.current?.click()} className="flex-1 flex items-center justify-center gap-2 bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-900 dark:text-white py-3.5 rounded-xl font-bold text-sm transition-colors cursor-pointer">
+                        <Upload size={18} /> Importer un fichier
+                    </button>
+                    <input ref={importInputRef} type="file" accept=".json,application/json" onChange={handleImportFile} className="hidden" />
+                </div>
+            </div>
+
           </div>
         )}
       </main>
@@ -637,7 +663,7 @@ export default function Dashboard() {
                         <h2 className="text-2xl font-bold dark:text-white flex items-center gap-2">
                             <Database className="text-blue-500" /> Archives Complètes
                         </h2>
-                        <p className="text-xs text-gray-500 mt-1 font-medium">Toutes les bobines terminées ou cachées depuis la création de votre compte.</p>
+                        <p className="text-xs text-gray-500 mt-1 font-medium">Toutes les bobines terminées ou cachées depuis le début.</p>
                     </div>
                     <button onClick={() => setIsFullHistoryModalOpen(false)} className="p-2 bg-gray-100 dark:bg-gray-800 rounded-full cursor-pointer hover:bg-gray-200 transition-colors"><X size={24} className="text-gray-600 dark:text-gray-400"/></button>
                 </div>

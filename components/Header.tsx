@@ -1,6 +1,6 @@
-import { Disc3, Package, History, Settings, Sun, Moon, LogOut } from 'lucide-react'
+import { Disc3, Package, History, Settings, Sun, Moon } from 'lucide-react'
 
-export default function Header({ activeTab, setActiveTab, theme, toggleTheme, handleSignOut }: any) {
+export default function Header({ activeTab, setActiveTab, theme, toggleTheme }: any) {
   return (
     <header className="bg-white/70 dark:bg-[#1C1C1E]/70 backdrop-blur-xl border-b border-gray-200/50 dark:border-gray-800/50 sticky top-0 z-30 transition-all">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex flex-col sm:flex-row justify-between items-center gap-4 sm:gap-0">
@@ -20,7 +20,6 @@ export default function Header({ activeTab, setActiveTab, theme, toggleTheme, ha
 
           <div className="flex items-center gap-3 absolute top-4 right-4 sm:static">
             <button onClick={toggleTheme} className="p-2 text-gray-500 dark:text-gray-400 hover:text-black dark:hover:text-yellow-400 transition-all cursor-pointer rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 hover:scale-110">{theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}</button>
-            <button onClick={handleSignOut} className="p-2 text-gray-400 hover:text-red-500 rounded-lg transition-all cursor-pointer hover:bg-red-50 dark:hover:bg-red-900/20 hover:scale-110"><LogOut size={20} /></button>
           </div>
         </div>
       </header>

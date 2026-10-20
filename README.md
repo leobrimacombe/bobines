@@ -1,36 +1,54 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SpoolTracker – appli Mac (hors ligne)
 
-## Getting Started
+Version locale de SpoolTracker pour Mac à puce Apple (M1 à M4). Tout tourne sur le Mac, sans compte ni Internet.
+Le site en ligne (Next.js + Supabase) vit sur la branche `main` et n'est pas concerné par ce dossier.
 
-First, run the development server:
+## Comment ça marche
+
+- **Electron** ouvre une fenêtre et lance en interne le serveur Next.js (`electron/main.js`).
+- **Données** : un seul fichier `data.json` dans `~/Library/Application Support/SpoolTracker/` (`lib/db.ts`).
+  - Une copie par jour d'utilisation va dans `sauvegardes/` (30 conservées).
+  - Menu SpoolTracker → *Ouvrir le dossier des données* pour y accéder.
+- **Export / import** : onglet Config → *Sauvegarde des données*.
+- **Mises à jour** : au démarrage, l'appli regarde les Releases GitHub dont le tag commence par `app-v`. Si une version plus récente existe, elle propose de télécharger le `.dmg`.
+
+## Développer
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+npm run dev     # interface dans le navigateur, données dans ./.data
+npm run app     # compile puis ouvre la vraie fenêtre Electron
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`npm run dist:test` produit une version de test non installée pour l'OS courant, dans `dist/`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Publier une nouvelle version
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Le `.dmg` est compilé sur un Mac de GitHub Actions (`.github/workflows/release-mac.yml`) quand on pousse un tag `app-v…` :
 
-## Learn More
+```bash
+git tag -a app-v1.1.0 -m "Ce qui change, en une ou deux lignes"
+git push origin app-v1.1.0
+```
 
-To learn more about Next.js, take a look at the following resources:
+- Le numéro du tag devient la version de l'appli.
+- Le message du tag s'affiche dans la fenêtre « Nouvelle version disponible ».
+- Le suivi de la compilation se fait dans l'onglet *Actions* du dépôt GitHub (environ 5 min).
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Installer sur le Mac (première fois)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Télécharger `SpoolTracker-x.y.z-arm64.dmg` depuis les Releases GitHub, l'ouvrir et glisser SpoolTracker dans Applications.
+2. Au premier lancement, macOS bloque l'appli car elle n'est pas signée par Apple.
+   Aller dans *Réglages Système → Confidentialité et sécurité*, descendre jusqu'à « SpoolTracker a été bloqué » et cliquer sur *Ouvrir quand même*.
+3. Si macOS dit que l'appli « est endommagée », taper dans le Terminal :
+   `xattr -cr /Applications/SpoolTracker.app`
 
-## Deploy on Vercel
+## Récupérer les données de l'ancienne version en ligne
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Si le projet Supabase est en pause, le réactiver depuis le tableau de bord Supabase (*Restore project*).
+2. Ajouter dans le `.env.local` du site (`../gestion-bobines/.env.local`) la clé `SUPABASE_SERVICE_ROLE_KEY`, à trouver dans Supabase → Project Settings → API Keys.
+3. Depuis ce dossier, lancer le script ci-dessous. Sans pseudo, il liste les comptes existants.
+   ```bash
+   node --env-file=../gestion-bobines/.env.local scripts/export-supabase.mjs <pseudo>
+   ```
+4. Dans l'appli : Config → *Importer un fichier* → choisir le `export-<pseudo>-<date>.json` créé.

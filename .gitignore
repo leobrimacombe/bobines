@@ -18,7 +18,7 @@
 /out/
 
 # production
-/build
+# (/build retiré : contient l'icône de l'appli)
 
 # misc
 .DS_Store
@@ -39,3 +39,12 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# données locales (dev)
+/.data
+
+# electron
+/dist
+
+# exports de données personnelles
+/export-*.json
