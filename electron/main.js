@@ -1,9 +1,12 @@
-// Point d'entrée de l'appli Mac : lance le serveur Next.js embarqué puis l'affiche dans une fenêtre
+// Point d'entrée de l'appli (Mac et Windows) : lance le serveur Next.js embarqué puis l'affiche dans une fenêtre
 const { app, BrowserWindow, Menu, dialog, shell, utilityProcess } = require('electron')
 const fs = require('fs')
 const path = require('path')
 const net = require('net')
 const http = require('http')
+const { spawn } = require('child_process')
+
+const IS_MAC = process.platform === 'darwin'
 
 const GITHUB_REPO = 'leobrimacombe/bobines'
 const PREFERRED_PORT = 47123 // port fixe pour que le thème (localStorage) soit conservé d'un lancement à l'autre
@@ -20,7 +23,7 @@ app.on('second-instance', () => {
 
 // --- DONNÉES & SAUVEGARDES ---
 
-const dataDir = () => app.getPath('userData') // ~/Library/Application Support/SpoolTracker
+const dataDir = () => app.getPath('userData') // ~/Library/Application Support/SpoolTracker ou %APPDATA%\SpoolTracker
 
 // Une copie de data.json par jour d'utilisation, on garde les 30 dernières
 function backupData() {
@@ -89,6 +92,7 @@ function createWindow(url) {
     minWidth: 900,
     minHeight: 600,
     backgroundColor: '#F5F5F7',
+    autoHideMenuBar: !IS_MAC, // Windows : le menu apparaît avec la touche Alt
     show: false,
     webPreferences: { contextIsolation: true, sandbox: true },
   })
@@ -136,8 +140,8 @@ async function checkForUpdates({ silent }) {
   }
 
   const current = app.getVersion()
-  const dmg = release?.assets?.find(a => a.name.endsWith('.dmg'))
-  if (!dmg || !isNewer(release.tag_name, current)) {
+  const installer = release?.assets?.find(a => a.name.endsWith(IS_MAC ? '.dmg' : '-Setup.exe'))
+  if (!installer || !isNewer(release.tag_name, current)) {
     if (!silent) dialog.showMessageBox(mainWindow, { type: 'info', message: 'SpoolTracker est à jour.', detail: `Version installée : ${current}` })
     return
   }
@@ -153,14 +157,18 @@ async function checkForUpdates({ silent }) {
   if (response !== 0) return
 
   try {
-    const file = await downloadUpdate(dmg)
+    const file = await downloadUpdate(installer)
     await dialog.showMessageBox(mainWindow, {
       type: 'info',
       message: 'Mise à jour téléchargée',
-      detail: 'Une fenêtre va s\'ouvrir : faites glisser SpoolTracker dans le dossier Applications, puis choisissez « Remplacer ».\n\nSpoolTracker va se fermer. Vos données sont conservées.',
+      detail: IS_MAC
+        ? 'Une fenêtre va s\'ouvrir : faites glisser SpoolTracker dans le dossier Applications, puis choisissez « Remplacer ».\n\nSpoolTracker va se fermer. Vos données sont conservées.'
+        : 'SpoolTracker va se fermer, s\'installer et se relancer tout seul. Vos données sont conservées.',
       buttons: ['OK'],
     })
-    await shell.openPath(file)
+    if (IS_MAC) await shell.openPath(file)
+    // L'installeur Windows met à jour l'appli en place puis la relance
+    else spawn(file, [], { detached: true, stdio: 'ignore' }).unref()
     app.quit()
   } catch (e) {
     mainWindow?.setProgressBar(-1)
@@ -172,7 +180,7 @@ async function downloadUpdate(asset) {
   const res = await fetch(asset.browser_download_url)
   if (!res.ok || !res.body) throw new Error(`Téléchargement impossible (${res.status})`)
 
-  const file = path.join(app.getPath('downloads'), asset.name)
+  const file = path.join(app.getPath(IS_MAC ? 'downloads' : 'temp'), asset.name)
   const out = fs.createWriteStream(file)
   const total = asset.size || Number(res.headers.get('content-length')) || 0
   let received = 0
@@ -198,9 +206,11 @@ function buildMenu() {
         { label: 'Rechercher des mises à jour…', click: () => checkForUpdates({ silent: false }) },
         { label: 'Ouvrir le dossier des données', click: () => shell.openPath(dataDir()) },
         { type: 'separator' },
-        { role: 'hide', label: `Masquer ${app.name}` },
-        { role: 'hideOthers', label: 'Masquer les autres' },
-        { type: 'separator' },
+        ...(IS_MAC ? [
+          { role: 'hide', label: `Masquer ${app.name}` },
+          { role: 'hideOthers', label: 'Masquer les autres' },
+          { type: 'separator' },
+        ] : []),
         { role: 'quit', label: `Quitter ${app.name}` },
       ],
     },

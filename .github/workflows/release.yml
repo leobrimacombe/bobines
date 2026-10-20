@@ -1,0 +1,66 @@
+# Compile l'appli pour Mac et Windows, puis publie les installeurs dans les Releases GitHub
+# quand on pousse un tag « app-v1.2.3 ».
+# L'appli installée vérifie ces Releases au démarrage et propose la mise à jour.
+name: Release appli
+
+on:
+  push:
+    tags:
+      - "app-v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest # Mac à puce Apple, comme le Mac mini M4
+            script: dist:mac
+            file: dist/*.dmg
+          - os: windows-latest
+            script: dist:win
+            file: dist/*-Setup.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      # La version de l'appli vient du tag : app-v1.2.3 → 1.2.3
+      - name: Version depuis le tag
+        shell: bash
+        run: npm version "${GITHUB_REF_NAME#app-v}" --no-git-tag-version --allow-same-version
+
+      - name: Compilation
+        run: npm run ${{ matrix.script }} -- --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installeur-${{ matrix.os }}
+          path: ${{ matrix.file }}
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: installeurs
+          merge-multiple: true
+
+      # Le message du tag (git tag -a ... -m "...") devient le texte « Nouveautés » affiché dans l'appli
+      - name: Publication
+        run: |
+          git fetch --force origin "refs/tags/$GITHUB_REF_NAME:refs/tags/$GITHUB_REF_NAME"
+          gh release create "$GITHUB_REF_NAME" installeurs/* --title "SpoolTracker ${GITHUB_REF_NAME#app-v}" --notes-from-tag
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

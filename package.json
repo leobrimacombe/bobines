@@ -11,6 +11,7 @@
     "build": "next build && node scripts/prepare-standalone.mjs",
     "app": "npm run build && electron .",
     "dist:mac": "npm run build && electron-builder --mac --arm64",
+    "dist:win": "npm run build && electron-builder --win --x64",
     "dist:test": "npm run build && electron-builder --dir",
     "lint": "eslint"
   },

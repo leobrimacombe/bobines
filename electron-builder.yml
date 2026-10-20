@@ -40,7 +40,24 @@ dmg:
   artifactName: SpoolTracker-${version}-arm64.${ext}
 
 win:
+  target:
+    - target: nsis
+      arch: x64
   icon: build/icon.png
+  # Pas de certificat (payant) : Windows affichera l'avertissement SmartScreen à la première installation
+  signAndEditExecutable: true
 
-# La publication est faite par le workflow GitHub (.github/workflows/release-mac.yml)
+# Installeur en un clic, pour l'utilisateur courant (pas besoin de droits administrateur).
+# Relancer un installeur plus récent met simplement l'appli à jour, les données restent dans %APPDATA%\SpoolTracker
+nsis:
+  oneClick: true
+  perMachine: false
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  shortcutName: SpoolTracker
+  runAfterFinish: true
+  deleteAppDataOnUninstall: false
+  artifactName: SpoolTracker-${version}-Setup.${ext}
+
+# La publication est faite par le workflow GitHub (.github/workflows/release.yml)
 publish: null
